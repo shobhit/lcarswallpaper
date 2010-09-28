@@ -20,6 +20,10 @@ import java.util.ArrayList;
 
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -27,6 +31,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
 import android.graphics.Typeface;
+import android.os.BatteryManager;
 import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
@@ -57,35 +62,82 @@ public class LCARSWallpaper extends WallpaperService {
 
 	class CubeEngine extends Engine {
 		final float scale = getResources().getDisplayMetrics().density;
-
+		private final int MAX_MODE = 1;
 		private final Paint mPaint = new Paint();
 		private final Paint tPaint = new Paint();
 		private final Paint ulPaint = new Paint();
 		private final Paint bPaint = new Paint();
 		private final Paint pPaint = new Paint();
+		private final Paint ePaint = new Paint();
 		private float mPixels;
+		private float mTouchX;
+		private float mTouchY;
 		private Bitmap lcars;
 		private Bitmap lcars_land;
+		private Bitmap deuterium;
 		private MemoryThread memThread;
 		private StatsThread statsThread;
 		ArrayList<String[]> dirs = new ArrayList<String[]>();
 		ArrayList<String[]> temp = new ArrayList<String[]>();
 		boolean isPortrait;
+		int mode;
+		private String level;
+		private String pressure;
+		private String status;
 		WindowManager win;
+		int angle = 0;
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
+				//for the deuterium electron orbit
+				//keep it moving even when not drawn
+				angle++;
+				if (angle > 360) {
+					angle = 0;
+				}
+
 				drawFrame();
 			}
 		};
+		private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				level = String.valueOf(intent.getIntExtra(
+						BatteryManager.EXTRA_LEVEL, 0)) + "%";
+				int s = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
+				switch (s) {
+				case BatteryManager.BATTERY_STATUS_CHARGING:
+					status = "Refilling deuterium";
+					break;
+				case BatteryManager.BATTERY_STATUS_DISCHARGING:
+					status = "Deuterium flow normal";
+					break;
+				case BatteryManager.BATTERY_STATUS_FULL:
+					status = "Deuterium tanks full";
+					break;
+				case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
+					status = "Deuterium refill stopped";
+					break;
+				case BatteryManager.BATTERY_STATUS_UNKNOWN:
+					status = "Deuterium status unknown";
+					break;
 
+				}
+				pressure = String.valueOf(intent.getIntExtra(
+						BatteryManager.EXTRA_VOLTAGE, 0));
+			}
+		};
 		private boolean mVisible;
 
 		CubeEngine() {
+			registerReceiver(batteryReceiver, new IntentFilter(
+					Intent.ACTION_BATTERY_CHANGED));
 			win = (WindowManager) getSystemService(WINDOW_SERVICE);
 			Resources res = getResources();
 			lcars = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars);
+			deuterium = BitmapFactory.decodeResource(res,
+					com.example.android.maxpapers.R.drawable.deuterium);
 			lcars_land = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
 			memThread = new MemoryThread(
@@ -98,6 +150,7 @@ public class LCARSWallpaper extends WallpaperService {
 			final Paint ul_paint = ulPaint;
 			final Paint b_paint = bPaint;
 			final Paint p_paint = pPaint;
+			final Paint e_paint = ePaint;
 			Typeface font = Typeface.createFromAsset(getAssets(),
 					"swiss_ec.ttf");
 			text_paint.setTypeface(font);
@@ -114,6 +167,10 @@ public class LCARSWallpaper extends WallpaperService {
 			b_paint.setColor(0xff000000);
 			b_paint.setAntiAlias(true);
 			b_paint.setTextAlign(Align.RIGHT);
+
+			e_paint.setColor(0xffff9f00);
+			e_paint.setAntiAlias(true);
+
 			p_paint.setTypeface(font);
 			p_paint.setTextSize(scale * 12f);
 			p_paint.setColor(0xff9f9fff);
@@ -128,6 +185,7 @@ public class LCARSWallpaper extends WallpaperService {
 			paint.setStrokeWidth(2);
 			paint.setStrokeCap(Paint.Cap.ROUND);
 			paint.setStyle(Paint.Style.STROKE);
+			mode = 0;
 
 		}
 
@@ -216,10 +274,25 @@ public class LCARSWallpaper extends WallpaperService {
 		 */
 		@Override
 		public void onTouchEvent(MotionEvent event) {
-			if (event.getAction() == MotionEvent.ACTION_MOVE) {
-				event.getX();
-				event.getY();
+			if (event.getAction() == MotionEvent.ACTION_DOWN) {
+				mTouchX = event.getX();
+				mTouchY = event.getY();
+				if (mTouchX >= mPixels + (487 * scale)
+						&& mTouchX <= mPixels + (577 * scale)
+						&& mTouchY >= (141 * scale) && mTouchY <= (164 * scale)) {
+					mode++;
+					if (mode > MAX_MODE) {
+						mode = 0;
+					}
+					// Reschedule the next redraw
+					mHandler.removeCallbacks(mDrawCube);
+					if (mVisible) {
+						mHandler.post(mDrawCube);
+					}
+				}
 			} else {
+				mTouchX = -1;
+				mTouchY = -1;
 			}
 			super.onTouchEvent(event);
 		}
@@ -249,7 +322,11 @@ public class LCARSWallpaper extends WallpaperService {
 					if (isPortrait) {
 						drawText(c);
 						drawButtonText(c);
-						drawProcText(c);
+						if (mode == 0) {
+							drawProcText(c);
+						} else if (mode == 1) {
+							drawDeuterium(c);
+						}
 					}
 				}
 			} finally {
@@ -272,6 +349,38 @@ public class LCARSWallpaper extends WallpaperService {
 			}
 		}
 
+		void drawDeuterium(Canvas c) {
+			if (isPortrait) {
+
+				c.drawBitmap(deuterium, mPixels + (scale * 487), (scale * 173),
+						mPaint);
+				Double x1 = new Double(mPixels + (scale * (834 / 1.5))
+						+ (scale * (83 / 1.5))
+						* Math.cos(angle * (Math.PI / 180)));
+				Double y1 = new Double((scale * (356 / 1.5))
+						+ (scale * (83 / 1.5))
+						* Math.sin(angle * (Math.PI / 180)));
+				ePaint.setColor(0xffffffff);
+				c.drawCircle(x1.floatValue(), y1.floatValue(), 8, ePaint);
+				ePaint.setColor(0xffff9f00);
+				c.drawCircle(x1.floatValue(), y1.floatValue(), 6, ePaint);
+				int h = Math.round(scale * 310);
+				c.drawText("STATUS:", mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+				c.drawText(status, mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+				c.drawText("LEVEL:", mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+				c.drawText(level, mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+				c.drawText("POWER:", mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+				c.drawText(pressure, mPixels + (scale * 625), h, pPaint);
+				h += (scale * 17);
+
+			}
+		}
+
 		void drawButtonText(Canvas c) {
 			int speed = Math.round(statsThread.getSpeed());
 			String sSpeed = "0000";
@@ -285,7 +394,7 @@ public class LCARSWallpaper extends WallpaperService {
 				sSpeed = String.valueOf(Math.round(speed));
 			}
 
-			c.drawText(sSpeed, mPixels + (625 * scale), (scale * 161), bPaint);
+			c.drawText(sSpeed, mPixels + (scale * 625), (scale * 161), bPaint);
 
 		}
 
@@ -307,9 +416,9 @@ public class LCARSWallpaper extends WallpaperService {
 			for (int i = 0; i < 23 && i < old_apps.length; i++) {
 				String[] toks = old_apps[i].split(";");
 				if (!list.contains(new Integer(toks[1]))) {
-					c.drawText(toks[0], mPixels + 822, h, pPaint);
-					c.drawText(toks[1], mPixels + 862, h, pPaint);
-					c.drawText(toks[2], mPixels + 937, h, pPaint);
+					c.drawText(toks[0], mPixels + (scale * 548), h, pPaint);
+					c.drawText(toks[1], mPixels + (scale * 575), h, pPaint);
+					c.drawText(toks[2], mPixels + (scale * 625), h, pPaint);
 					h += (scale * 17);
 				}
 			}
