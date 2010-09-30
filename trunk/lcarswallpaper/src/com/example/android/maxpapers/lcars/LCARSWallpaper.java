@@ -1,22 +1,18 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * LCARS Live Wallpaper
+ * A live wallpaper for the Android platform.  Displays the 
+ * familiar ST:TNG LCARS interface on your background with 
+ * several live system stats.
+ * 
+ * Author: cedarrapidsboy
+ * 
+ * 
  */
 
 package com.example.android.maxpapers.lcars;
 
 import java.util.ArrayList;
+import java.util.Date;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -36,7 +32,6 @@ import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
-import android.view.WindowManager;
 
 /*
  * This animated wallpaper draws a rotating wireframe cube.
@@ -44,6 +39,9 @@ import android.view.WindowManager;
 public class LCARSWallpaper extends WallpaperService {
 
 	private final Handler mHandler = new Handler();
+	private final float TEXT_LARGE = 24f;
+	private final float TEXT_MEDIUM = 16f;
+	private final float TEXT_SMALL = 12f;
 
 	@Override
 	public void onCreate() {
@@ -63,12 +61,13 @@ public class LCARSWallpaper extends WallpaperService {
 	class CubeEngine extends Engine {
 		final float scale = getResources().getDisplayMetrics().density;
 		private final int MAX_MODE = 1;
-		private final Paint mPaint = new Paint();
-		private final Paint tPaint = new Paint();
-		private final Paint ulPaint = new Paint();
-		private final Paint bPaint = new Paint();
-		private final Paint pPaint = new Paint();
-		private final Paint ePaint = new Paint();
+		private final Paint bitmapPaint = new Paint();
+		private final Paint usagePaint = new Paint();
+		private final Paint uptimePaint = new Paint();
+		private final Paint buttonPaint = new Paint();
+		private final Paint processPaint = new Paint();
+		private final Paint powerPaint = new Paint();
+		private final Paint electronPaint = new Paint();
 		private float mPixels;
 		private float mTouchX;
 		private float mTouchY;
@@ -77,28 +76,20 @@ public class LCARSWallpaper extends WallpaperService {
 		private Bitmap deuterium;
 		private MemoryThread memThread;
 		private StatsThread statsThread;
-		ArrayList<String[]> dirs = new ArrayList<String[]>();
-		ArrayList<String[]> temp = new ArrayList<String[]>();
-		boolean isPortrait;
-		int mode;
+		private boolean isPortrait;
+		private int mode;
 		private String level;
-		private String pressure;
+		private String eV;
 		private String status;
-		WindowManager win;
-		int angle = 0;
+		private int framerate = 1000;
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
-				//for the deuterium electron orbit
-				//keep it moving even when not drawn
-				angle++;
-				if (angle > 360) {
-					angle = 0;
-				}
-
 				drawFrame();
 			}
 		};
+
+
 		private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
 			@Override
 			public void onReceive(Context context, Intent intent) {
@@ -123,8 +114,8 @@ public class LCARSWallpaper extends WallpaperService {
 					break;
 
 				}
-				pressure = String.valueOf(intent.getIntExtra(
-						BatteryManager.EXTRA_VOLTAGE, 0));
+				int i = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
+				eV = String.valueOf(DateCalc.roundToDecimals(i / 1000d, 2));
 			}
 		};
 		private boolean mVisible;
@@ -132,7 +123,6 @@ public class LCARSWallpaper extends WallpaperService {
 		CubeEngine() {
 			registerReceiver(batteryReceiver, new IntentFilter(
 					Intent.ACTION_BATTERY_CHANGED));
-			win = (WindowManager) getSystemService(WINDOW_SERVICE);
 			Resources res = getResources();
 			lcars = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars);
@@ -145,25 +135,26 @@ public class LCARSWallpaper extends WallpaperService {
 					10000);
 			statsThread = new StatsThread(1000);
 			// Create a Paint to draw the lines for our cube
-			final Paint paint = mPaint;
-			final Paint text_paint = tPaint;
-			final Paint ul_paint = ulPaint;
-			final Paint b_paint = bPaint;
-			final Paint p_paint = pPaint;
-			final Paint e_paint = ePaint;
+			final Paint paint = bitmapPaint;
+			final Paint text_paint = usagePaint;
+			final Paint ul_paint = uptimePaint;
+			final Paint b_paint = buttonPaint;
+			final Paint p_paint = processPaint;
+			final Paint e_paint = electronPaint;
+			final Paint w_paint = powerPaint;
 			Typeface font = Typeface.createFromAsset(getAssets(),
 					"swiss_ec.ttf");
 			text_paint.setTypeface(font);
-			text_paint.setTextSize(scale * 24f);
+			text_paint.setTextSize(scale * TEXT_LARGE);
 			text_paint.setColor(0xffff9f00);
 			text_paint.setAntiAlias(true);
 			ul_paint.setTypeface(font);
-			ul_paint.setTextSize(scale * 16f);
+			ul_paint.setTextSize(scale * TEXT_MEDIUM);
 			ul_paint.setColor(0xffff9f00);
 			ul_paint.setAntiAlias(true);
 			ul_paint.setTextAlign(Align.RIGHT);
 			b_paint.setTypeface(font);
-			b_paint.setTextSize(scale * 12f);
+			b_paint.setTextSize(scale * TEXT_SMALL);
 			b_paint.setColor(0xff000000);
 			b_paint.setAntiAlias(true);
 			b_paint.setTextAlign(Align.RIGHT);
@@ -172,10 +163,16 @@ public class LCARSWallpaper extends WallpaperService {
 			e_paint.setAntiAlias(true);
 
 			p_paint.setTypeface(font);
-			p_paint.setTextSize(scale * 12f);
+			p_paint.setTextSize(scale * TEXT_SMALL);
 			p_paint.setColor(0xff9f9fff);
 			p_paint.setAntiAlias(true);
 			p_paint.setTextAlign(Align.RIGHT);
+
+			w_paint.setTypeface(font);
+			w_paint.setTextSize(scale * TEXT_MEDIUM);
+			w_paint.setColor(0xff9f9fff);
+			w_paint.setAntiAlias(true);
+			w_paint.setTextAlign(Align.RIGHT);
 
 			// text_paint.setStrokeWidth(2);
 			text_paint.setStrokeCap(Paint.Cap.ROUND);
@@ -284,6 +281,10 @@ public class LCARSWallpaper extends WallpaperService {
 					if (mode > MAX_MODE) {
 						mode = 0;
 					}
+					framerate = 1000;
+					if (mode == 1){
+						framerate = 100;
+					}
 					// Reschedule the next redraw
 					mHandler.removeCallbacks(mDrawCube);
 					if (mVisible) {
@@ -325,7 +326,8 @@ public class LCARSWallpaper extends WallpaperService {
 						if (mode == 0) {
 							drawProcText(c);
 						} else if (mode == 1) {
-							drawDeuterium(c);
+							drawAtom(c);
+							drawPowerStats(c);
 						}
 					}
 				}
@@ -337,47 +339,57 @@ public class LCARSWallpaper extends WallpaperService {
 			// Reschedule the next redraw
 			mHandler.removeCallbacks(mDrawCube);
 			if (mVisible) {
-				mHandler.postDelayed(mDrawCube, 1000);
+				mHandler.postDelayed(mDrawCube, framerate);
 			}
 		}
 
 		void drawBitmap(Canvas c) {
 			if (!isPortrait) {
-				c.drawBitmap(lcars_land, mPixels, 0, mPaint);
+				c.drawBitmap(lcars_land, mPixels, 0, bitmapPaint);
 			} else {
-				c.drawBitmap(lcars, mPixels, 0, mPaint);
+				c.drawBitmap(lcars, mPixels, 0, bitmapPaint);
 			}
 		}
 
-		void drawDeuterium(Canvas c) {
-			if (isPortrait) {
+		void drawPowerStats(Canvas c) {
+			int h = Math.round(scale * 320);
+			powerPaint.setTextSize(scale * TEXT_LARGE);
+			c.drawText("STATUS:", mPixels + (scale * 625), h, powerPaint);
+			h += (scale * 17);
+			powerPaint.setTextSize(scale * TEXT_MEDIUM);
+			c.drawText(status, mPixels + (scale * 625), h, powerPaint);
+			h += (scale * 36);
+			powerPaint.setTextSize(scale * TEXT_LARGE);
+			c.drawText("LEVEL:", mPixels + (scale * 625), h, powerPaint);
+			h += (scale * 17);
+			powerPaint.setTextSize(scale * TEXT_MEDIUM);
+			c.drawText(level, mPixels + (scale * 625), h, powerPaint);
+			h += (scale * 36);
+			powerPaint.setTextSize(scale * TEXT_LARGE);
+			c.drawText("ENERGY:", mPixels + (scale * 625), h, powerPaint);
+			// h += (scale * 17);
+			powerPaint.setTextSize(scale * TEXT_MEDIUM);
+			// c.drawText(dynCm + " dyn/cm", mPixels + (scale * 625), h,
+			// wPaint);
+			h += (scale * 17);
+			c.drawText(eV + " V", mPixels + (scale * 625), h, powerPaint);
+		}
 
+		void drawAtom(Canvas c) {
+			if (isPortrait) {
+				long time = new Date().getTime() / 100;
 				c.drawBitmap(deuterium, mPixels + (scale * 487), (scale * 173),
-						mPaint);
+						bitmapPaint);
 				Double x1 = new Double(mPixels + (scale * (834 / 1.5))
 						+ (scale * (83 / 1.5))
-						* Math.cos(angle * (Math.PI / 180)));
+						* Math.cos((time % 360) * (Math.PI / 180)));
 				Double y1 = new Double((scale * (356 / 1.5))
 						+ (scale * (83 / 1.5))
-						* Math.sin(angle * (Math.PI / 180)));
-				ePaint.setColor(0xffffffff);
-				c.drawCircle(x1.floatValue(), y1.floatValue(), 8, ePaint);
-				ePaint.setColor(0xffff9f00);
-				c.drawCircle(x1.floatValue(), y1.floatValue(), 6, ePaint);
-				int h = Math.round(scale * 310);
-				c.drawText("STATUS:", mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-				c.drawText(status, mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-				c.drawText("LEVEL:", mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-				c.drawText(level, mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-				c.drawText("POWER:", mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-				c.drawText(pressure, mPixels + (scale * 625), h, pPaint);
-				h += (scale * 17);
-
+						* Math.sin((time % 360) * (Math.PI / 180)));
+				electronPaint.setColor(0xffffffff);
+				c.drawCircle(x1.floatValue(), y1.floatValue(), 8, electronPaint);
+				electronPaint.setColor(0xffff9f00);
+				c.drawCircle(x1.floatValue(), y1.floatValue(), 6, electronPaint);
 			}
 		}
 
@@ -394,7 +406,8 @@ public class LCARSWallpaper extends WallpaperService {
 				sSpeed = String.valueOf(Math.round(speed));
 			}
 
-			c.drawText(sSpeed, mPixels + (scale * 625), (scale * 161), bPaint);
+			c.drawText(sSpeed, mPixels + (scale * 625), (scale * 161),
+					buttonPaint);
 
 		}
 
@@ -408,17 +421,20 @@ public class LCARSWallpaper extends WallpaperService {
 					&& i < old_services.length; i++) {
 				String[] toks = old_services[i].split(";");
 				list.add(new Integer(toks[1]));
-				c.drawText(toks[0], mPixels + (scale * 548), h, pPaint);
-				c.drawText(toks[1], mPixels + (scale * 575), h, pPaint);
-				c.drawText(toks[2], mPixels + (scale * 625), h, pPaint);
+				c.drawText(toks[0], mPixels + (scale * 548), h, processPaint);
+				c.drawText(toks[1], mPixels + (scale * 575), h, processPaint);
+				c.drawText(toks[2], mPixels + (scale * 625), h, processPaint);
 				h += (scale * 17);
 			}
 			for (int i = 0; i < 23 && i < old_apps.length; i++) {
 				String[] toks = old_apps[i].split(";");
 				if (!list.contains(new Integer(toks[1]))) {
-					c.drawText(toks[0], mPixels + (scale * 548), h, pPaint);
-					c.drawText(toks[1], mPixels + (scale * 575), h, pPaint);
-					c.drawText(toks[2], mPixels + (scale * 625), h, pPaint);
+					c.drawText(toks[0], mPixels + (scale * 548), h,
+							processPaint);
+					c.drawText(toks[1], mPixels + (scale * 575), h,
+							processPaint);
+					c.drawText(toks[2], mPixels + (scale * 625), h,
+							processPaint);
 					h += (scale * 17);
 				}
 			}
@@ -459,23 +475,26 @@ public class LCARSWallpaper extends WallpaperService {
 					+ String.valueOf(DateCalc.getDecDay());
 			String sTTC = String.valueOf(DateCalc.getDaysToFirstContact());
 			c.drawText(sReading + "%", mPixels + (scale * 367), (scale * 200),
-					tPaint);
+					usagePaint);
 			// c.drawText(dur + " " + sDays + " " + sHours + ":" + sMins + ":" +
 			// sSecs, mPixels + 222, 69, ulPaint);
-			c.drawText(dur, mPixels + (scale * 87), (scale * 46), ulPaint);
-			c.drawText(sDays, mPixels + (scale * 107), (scale * 46), ulPaint);
+			c.drawText(dur, mPixels + (scale * 87), (scale * 46), uptimePaint);
+			c.drawText(sDays, mPixels + (scale * 107), (scale * 46),
+					uptimePaint);
 			c.drawText(sHours + ":" + sMins + ":" + sSecs, mPixels
-					+ (scale * 160), (scale * 46), ulPaint);
-			c.drawText(sd, mPixels + (scale * 87), (scale * 63), ulPaint);
-			c.drawText("--", mPixels + (scale * 107), (scale * 63), ulPaint);
+					+ (scale * 160), (scale * 46), uptimePaint);
+			c.drawText(sd, mPixels + (scale * 87), (scale * 63), uptimePaint);
+			c.drawText("--", mPixels + (scale * 107), (scale * 63), uptimePaint);
 			c.drawText(String.valueOf(DateCalc.stardate()), mPixels
-					+ (scale * 160), (scale * 63), ulPaint);
-			c.drawText("TER", mPixels + (scale * 87), (scale * 81), ulPaint);
-			c.drawText(sThours, mPixels + (scale * 107), (scale * 81), ulPaint);
-			c.drawText(sTerran, mPixels + (scale * 160), (scale * 81), ulPaint);
-			c.drawText("TTC", mPixels + (scale * 87), (scale * 98), ulPaint);
-			c.drawText("--", mPixels + (scale * 107), (scale * 98), ulPaint);
-			c.drawText(sTTC, mPixels + (scale * 160), (scale * 98), ulPaint);
+					+ (scale * 160), (scale * 63), uptimePaint);
+			c.drawText("TER", mPixels + (scale * 87), (scale * 81), uptimePaint);
+			c.drawText(sThours, mPixels + (scale * 107), (scale * 81),
+					uptimePaint);
+			c.drawText(sTerran, mPixels + (scale * 160), (scale * 81),
+					uptimePaint);
+			c.drawText("TTC", mPixels + (scale * 87), (scale * 98), uptimePaint);
+			c.drawText("--", mPixels + (scale * 107), (scale * 98), uptimePaint);
+			c.drawText(sTTC, mPixels + (scale * 160), (scale * 98), uptimePaint);
 
 		}
 

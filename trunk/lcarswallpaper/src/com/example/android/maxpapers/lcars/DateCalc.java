@@ -18,7 +18,18 @@ public class DateCalc {
 		return dStardateToday;
 
 	}
-	
+	public static String toScientific(double num,int places) { 
+		   double power=(int)(Math.log(num)/Math.log(10));
+		   if(power < 0) power--;
+		   double fraction=num/Math.pow(10,power);
+		   String result="";     
+		   String sign="";
+		   fraction=roundToDecimals(fraction,places); 
+		   if(power > 0) sign="+";
+		   result+=fraction+"e"+sign+power;
+		   return result;
+		   }
+
 	public static double roundToDecimals(double d, int c) {
 		int temp=(int)((d*Math.pow(10,c)));
 		return (((double)temp)/Math.pow(10,c));
