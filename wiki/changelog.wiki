@@ -1,0 +1,11 @@
+== 1.0.x ==
+  * larger font for deuterium status
+  * faster frame rate when viewing deuterium status (better atom animation)
+  * removed some dead code
+
+== 1.0.1 ==
+  * Deuterium (battery) status
+  * Click "Warp EF" to switch between power and memory stats
+
+== 1.0.0 ==
+  * First release
