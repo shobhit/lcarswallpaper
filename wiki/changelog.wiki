@@ -1,4 +1,6 @@
 == 1.0.x ==
+  * Improved thread code (using java.util.concurrent.Semaphore - thanks Dave!)
+  * CAUTION graphic when battery hits 20%
   * larger font for deuterium status
   * faster frame rate when viewing deuterium status (better atom animation)
   * removed some dead code
