@@ -1,5 +1,6 @@
 package com.example.android.maxpapers.lcars;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 
@@ -32,7 +33,7 @@ public class DateCalc {
 
 	public static double roundToDecimals(double d, int c) {
 		int temp=(int)((d*Math.pow(10,c)));
-		return (((double)temp)/Math.pow(10,c));
+		return ((temp)/Math.pow(10,c));
 		}
 	
 	public static int getDay(){
@@ -40,7 +41,7 @@ public class DateCalc {
 	}
 	public static int getDecDay(){
 		GregorianCalendar cal = new GregorianCalendar(getYear(), getMonth(), getDay());
-		return Math.round(((float)(getDay() - 1) / (float)cal.getActualMaximum(GregorianCalendar.DAY_OF_MONTH)) * 10f);
+		return Math.round(((float)(getDay() - 1) / (float)cal.getActualMaximum(Calendar.DAY_OF_MONTH)) * 10f);
 	}
 	
 	public static int getYear(){
