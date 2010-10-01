@@ -14,7 +14,6 @@ package com.example.android.maxpapers.lcars;
 import java.util.ArrayList;
 import java.util.Date;
 
-import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -42,6 +41,8 @@ public class LCARSWallpaper extends WallpaperService {
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
 	private final float TEXT_SMALL = 12f;
+	private final int CAUTION_FR = 100;
+	private final int NORMAL_FR = 1000;
 
 	@Override
 	public void onCreate() {
@@ -74,10 +75,12 @@ public class LCARSWallpaper extends WallpaperService {
 		private Bitmap lcars;
 		private Bitmap lcars_land;
 		private Bitmap deuterium;
+		private Bitmap caution;
 		private MemoryThread memThread;
 		private StatsThread statsThread;
 		private boolean isPortrait;
 		private int mode;
+		private boolean bCaution = false;
 		private String level;
 		private String eV;
 		private String status;
@@ -89,12 +92,16 @@ public class LCARSWallpaper extends WallpaperService {
 			}
 		};
 
-
 		private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
 			@Override
 			public void onReceive(Context context, Intent intent) {
-				level = String.valueOf(intent.getIntExtra(
-						BatteryManager.EXTRA_LEVEL, 0)) + "%";
+				int iLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+				level = String.valueOf(iLevel) + "%";
+				bCaution = (iLevel <= 20);
+				framerate = NORMAL_FR;
+				if (bCaution) {
+					framerate = CAUTION_FR;
+				}
 				int s = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
 				switch (s) {
 				case BatteryManager.BATTERY_STATUS_CHARGING:
@@ -128,10 +135,12 @@ public class LCARSWallpaper extends WallpaperService {
 					com.example.android.maxpapers.R.drawable.lcars);
 			deuterium = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.deuterium);
+			caution = BitmapFactory.decodeResource(res,
+					com.example.android.maxpapers.R.drawable.caution);
 			lcars_land = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
 			memThread = new MemoryThread(
-					(ActivityManager) getSystemService(Activity.ACTIVITY_SERVICE),
+					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
 					10000);
 			statsThread = new StatsThread(1000);
 			// Create a Paint to draw the lines for our cube
@@ -198,21 +207,21 @@ public class LCARSWallpaper extends WallpaperService {
 		public void onDestroy() {
 			super.onDestroy();
 			mHandler.removeCallbacks(mDrawCube);
-			memThread.stopCollection();
-			statsThread.stopCollection();
+			memThread.stopThread();
+			statsThread.stopThread();
 		}
 
 		@Override
 		public void onVisibilityChanged(boolean visible) {
 			mVisible = visible;
 			if (visible) {
-				memThread.resumeCollection();
-				statsThread.resumeCollection();
+				memThread.resumeThread();
+				statsThread.resumeThread();
 				drawFrame();
 			} else {
 				mHandler.removeCallbacks(mDrawCube);
-				memThread.pauseCollection();
-				statsThread.pauseCollection();
+				memThread.pauseThread();
+				statsThread.pauseThread();
 			}
 		}
 
@@ -239,8 +248,8 @@ public class LCARSWallpaper extends WallpaperService {
 			super.onSurfaceDestroyed(holder);
 			mVisible = false;
 			mHandler.removeCallbacks(mDrawCube);
-			memThread.stopCollection();
-			statsThread.stopCollection();
+			memThread.stopThread();
+			statsThread.stopThread();
 			boolean retry = true;
 			while (retry) {
 				try {
@@ -282,7 +291,7 @@ public class LCARSWallpaper extends WallpaperService {
 						mode = 0;
 					}
 					framerate = 1000;
-					if (mode == 1){
+					if (mode == 1) {
 						framerate = 100;
 					}
 					// Reschedule the next redraw
@@ -321,6 +330,8 @@ public class LCARSWallpaper extends WallpaperService {
 					// drawCube(c);
 					// drawTouchPoint(c);
 					if (isPortrait) {
+						if (bCaution)
+							drawCaution(c);
 						drawText(c);
 						drawButtonText(c);
 						if (mode == 0) {
@@ -390,6 +401,35 @@ public class LCARSWallpaper extends WallpaperService {
 				c.drawCircle(x1.floatValue(), y1.floatValue(), 8, electronPaint);
 				electronPaint.setColor(0xffff9f00);
 				c.drawCircle(x1.floatValue(), y1.floatValue(), 6, electronPaint);
+			}
+		}
+
+		private int loop = 0;
+
+		void drawCaution(Canvas c) {
+			if (isPortrait) {
+				loop++;
+				if (loop > 20)
+					loop = 0;
+				c.drawBitmap(caution, mPixels + (scale * (100 / 1.5f)),
+						(scale * (285 / 1.5f)), bitmapPaint);
+				int factor = Math.abs(10 - loop);
+				factor = factor * 5;
+				factor = 50 + factor;
+				int hex = Integer.parseInt(Integer.toHexString(factor)
+						+ "000000", 16);
+				electronPaint.setColor(hex);
+				Align align = usagePaint.getTextAlign();
+				usagePaint.setTextAlign(Align.CENTER);
+				c.drawText("DEUTERIUM LEVELS AT " + level, mPixels + scale
+						* ((285 + 80) / 1.5f), (scale * ((285 + 305) / 1.5f)),
+						usagePaint);
+				usagePaint.setTextAlign(align);
+
+				c.drawRect(mPixels + (scale * (100 / 1.5f)),
+						(scale * (285 / 1.5f)), mPixels
+								+ (scale * ((100 + 517) / 1.5f)),
+						(scale * ((285 + 458) / 1.5f)), electronPaint);
 			}
 		}
 

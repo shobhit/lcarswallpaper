@@ -37,7 +37,7 @@ public class ProcInfo {
 	 */
 	public String[] getServiceInfo(int count) {
 
-		List<RunningServiceInfo> services = (ArrayList<RunningServiceInfo>) activityManager
+		List<RunningServiceInfo> services = activityManager
 				.getRunningServices(count);
 		List<Integer> pids = new ArrayList<Integer>();
 		Iterator<RunningServiceInfo> serviceIterator = services.iterator();
@@ -84,7 +84,7 @@ public class ProcInfo {
 	 **/
 	public String[] getAppInfo() {
 
-		List<RunningAppProcessInfo> processes = (List<RunningAppProcessInfo>) activityManager
+		List<RunningAppProcessInfo> processes = activityManager
 				.getRunningAppProcesses();
 		List<Integer> pids = new ArrayList<Integer>();
 		Iterator<RunningAppProcessInfo> serviceIterator = processes.iterator();
