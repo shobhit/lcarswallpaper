@@ -4,48 +4,107 @@ public class StatsThread extends AbstractThread {
 
 	private CPULoad cpu = new CPULoad();
 
-	private int usage;
-	private int speed;
-	private long uptime;
+	private String usage;
+	private String upDays;
+	private String upHours;
+	private String upMins;
+	private String upSecs;
+	private String tHours;
+	private String tDate;
+	private String sTTC;
+	private String sSpeed;
 
 	public StatsThread(int poll) {
 		super(poll);
 		cpu = new CPULoad();
-		setUsage(0);
-		setSpeed(0);
-		setUptime(0);
+
 	}
 
 	@Override
 	protected void doStuff() {
-		setUsage(Math.round(cpu.getUsage()));
-		setUptime(Math.round(cpu.getUptime()));
-		setSpeed(Math.round(cpu.getSpeed()));
+		int iUsage = (Math.round(cpu.getUsage()));
+		long uptime = (Math.round(cpu.getUptime()));
+		int speed = (Math.round(cpu.getSpeed()));
+		int days = (int) (uptime / 86400);
+		int hours = (int) ((uptime % 86400) / 3600);
+		int minutes = (int) (((uptime % 86400) % 3600) / 60);
+		int seconds = (int) (((uptime % 86400) % 3600) % 60);
+		usage = "000";
+		if (iUsage < 10) {
+			usage = "00" + String.valueOf(iUsage);
+		} else if (iUsage < 100) {
+			usage = "0" + String.valueOf(iUsage);
+		} else {
+			usage = "100";
+		}
+		upDays = (days < 10) ? "0" + String.valueOf(days) : String
+				.valueOf(days);
+		upHours = (hours < 10) ? "0" + String.valueOf(hours) : String
+				.valueOf(hours);
+		upMins = (minutes < 10) ? "0" + String.valueOf(minutes) : String
+				.valueOf(minutes);
+		upSecs = (seconds < 10) ? "0" + String.valueOf(seconds) : String
+				.valueOf(seconds);
+		String tMonth = (DateCalc.getMonth()) < 10 ? "0"
+				+ String.valueOf(DateCalc.getMonth()) : String.valueOf(DateCalc
+				.getMonth());
+		tHours = (DateCalc.getHours() < 10) ? "0"
+				+ String.valueOf(DateCalc.getHours()) : String.valueOf(DateCalc
+				.getHours());
+		tDate = String.valueOf(DateCalc.getYear()) + tMonth + "."
+				+ String.valueOf(DateCalc.getDecDay());
+		sTTC = String.valueOf(DateCalc.getDaysToFirstContact());
 
+		sSpeed = "0000";
+		if (speed < 10) {
+			sSpeed = "000" + String.valueOf(speed);
+		} else if (speed < 100) {
+			sSpeed = "00" + String.valueOf(speed);
+		} else if (speed < 1000) {
+			sSpeed = "0" + String.valueOf(speed);
+		} else {
+			sSpeed = String.valueOf(Math.round(speed));
+		}
 	}
 
-	private void setUsage(int usage) {
-		this.usage = usage;
+	public CPULoad getCpu() {
+		return cpu;
 	}
 
-	public int getUsage() {
+	public String getUsage() {
 		return usage;
 	}
 
-	private void setUptime(long uptime) {
-		this.uptime = uptime;
+	public String getUpDays() {
+		return upDays;
 	}
 
-	public long getUptime() {
-		return uptime;
+	public String getUpHours() {
+		return upHours;
 	}
 
-	private void setSpeed(int speed) {
-		this.speed = speed;
+	public String getUpMins() {
+		return upMins;
 	}
 
-	public int getSpeed() {
-		return speed;
+	public String getUpSecs() {
+		return upSecs;
+	}
+
+	public String gettHours() {
+		return tHours;
+	}
+
+	public String gettDate() {
+		return tDate;
+	}
+
+	public String getsTTC() {
+		return sTTC;
+	}
+
+	public String getsSpeed() {
+		return sSpeed;
 	}
 
 }

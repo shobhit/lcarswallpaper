@@ -11,9 +11,6 @@
 
 package com.example.android.maxpapers.lcars;
 
-import java.util.ArrayList;
-import java.util.Date;
-
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -78,6 +75,7 @@ public class LCARSWallpaper extends WallpaperService {
 		private Bitmap caution;
 		private MemoryThread memThread;
 		private StatsThread statsThread;
+		private ElectronCalcThread electronThread;
 		private boolean isPortrait;
 		private int mode;
 		private boolean bCaution = false;
@@ -143,6 +141,8 @@ public class LCARSWallpaper extends WallpaperService {
 					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
 					10000);
 			statsThread = new StatsThread(1000);
+			electronThread = new ElectronCalcThread(0, scale, 33);
+			electronThread.pauseThread();
 			// Create a Paint to draw the lines for our cube
 			final Paint paint = bitmapPaint;
 			final Paint text_paint = usagePaint;
@@ -209,6 +209,7 @@ public class LCARSWallpaper extends WallpaperService {
 			mHandler.removeCallbacks(mDrawCube);
 			memThread.stopThread();
 			statsThread.stopThread();
+			electronThread.stopThread();
 		}
 
 		@Override
@@ -217,11 +218,17 @@ public class LCARSWallpaper extends WallpaperService {
 			if (visible) {
 				memThread.resumeThread();
 				statsThread.resumeThread();
+				if (mode == 1) {
+					electronThread.resumeThread();
+				}
 				drawFrame();
 			} else {
 				mHandler.removeCallbacks(mDrawCube);
 				memThread.pauseThread();
 				statsThread.pauseThread();
+				if (mode == 1) {
+					electronThread.pauseThread();
+				}
 			}
 		}
 
@@ -241,6 +248,7 @@ public class LCARSWallpaper extends WallpaperService {
 			super.onSurfaceCreated(holder);
 			memThread.start();
 			statsThread.start();
+			electronThread.start();
 		}
 
 		@Override
@@ -250,27 +258,25 @@ public class LCARSWallpaper extends WallpaperService {
 			mHandler.removeCallbacks(mDrawCube);
 			memThread.stopThread();
 			statsThread.stopThread();
+			electronThread.stopThread();
 			boolean retry = true;
 			while (retry) {
 				try {
 					memThread.join();
-					retry = false;
-				} catch (InterruptedException e) {
-				}
-			}
-			while (retry) {
-				try {
 					statsThread.join();
+					electronThread.join();
 					retry = false;
 				} catch (InterruptedException e) {
 				}
 			}
+
 		}
 
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
 			mPixels = xPixels;
+			electronThread.setmPixels(mPixels);
 			drawFrame();
 		}
 
@@ -290,9 +296,12 @@ public class LCARSWallpaper extends WallpaperService {
 					if (mode > MAX_MODE) {
 						mode = 0;
 					}
-					framerate = 1000;
 					if (mode == 1) {
+						electronThread.resumeThread();
 						framerate = 100;
+					} else {
+						framerate = 1000;
+						electronThread.pauseThread();
 					}
 					// Reschedule the next redraw
 					mHandler.removeCallbacks(mDrawCube);
@@ -380,19 +389,14 @@ public class LCARSWallpaper extends WallpaperService {
 
 		void drawAtom(Canvas c) {
 			if (isPortrait) {
-				long time = new Date().getTime() / 100;
 				c.drawBitmap(deuterium, mPixels + (scale * 487), (scale * 173),
 						bitmapPaint);
-				Double x1 = new Double(mPixels + (scale * (834 / 1.5))
-						+ (scale * (83 / 1.5))
-						* Math.cos((time % 360) * (Math.PI / 180)));
-				Double y1 = new Double((scale * (356 / 1.5))
-						+ (scale * (83 / 1.5))
-						* Math.sin((time % 360) * (Math.PI / 180)));
 				electronPaint.setColor(0xffffffff);
-				c.drawCircle(x1.floatValue(), y1.floatValue(), 8, electronPaint);
+				c.drawCircle(electronThread.getX1().floatValue(),
+						electronThread.getY1().floatValue(), 8, electronPaint);
 				electronPaint.setColor(0xffff9f00);
-				c.drawCircle(x1.floatValue(), y1.floatValue(), 6, electronPaint);
+				c.drawCircle(electronThread.getX1().floatValue(),
+						electronThread.getY1().floatValue(), 6, electronPaint);
 			}
 		}
 
@@ -426,107 +430,50 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		void drawButtonText(Canvas c) {
-			int speed = Math.round(statsThread.getSpeed());
-			String sSpeed = "0000";
-			if (speed < 10) {
-				sSpeed = "000" + String.valueOf(speed);
-			} else if (speed < 100) {
-				sSpeed = "00" + String.valueOf(speed);
-			} else if (speed < 1000) {
-				sSpeed = "0" + String.valueOf(speed);
-			} else {
-				sSpeed = String.valueOf(Math.round(speed));
-			}
-
-			c.drawText(sSpeed, mPixels + (scale * 625), (scale * 161),
-					buttonPaint);
-
+			c.drawText(statsThread.getsSpeed(), mPixels + (scale * 625),
+					(scale * 161), buttonPaint);
 		}
 
 		void drawProcText(Canvas c) {
 
 			int h = Math.round(scale * 177);
-			String[] old_services = memThread.getServices();
-			String[] old_apps = memThread.getApps();
-			ArrayList<Integer> list = new ArrayList<Integer>();
-			for (int i = 0; i < (23 - old_apps.length)
-					&& i < old_services.length; i++) {
-				String[] toks = old_services[i].split(";");
-				list.add(new Integer(toks[1]));
-				c.drawText(toks[0], mPixels + (scale * 548), h, processPaint);
-				c.drawText(toks[1], mPixels + (scale * 575), h, processPaint);
-				c.drawText(toks[2], mPixels + (scale * 625), h, processPaint);
+			Process[] processes = memThread.getProcesses();
+			for (int i = 0; i < processes.length; i++) {
+				c.drawText(processes[i].getName(), mPixels + (scale * 548), h,
+						processPaint);
+				c.drawText(String.valueOf(processes[i].getPid()), mPixels
+						+ (scale * 575), h, processPaint);
+				c.drawText(String.valueOf(processes[i].getMemory()), mPixels
+						+ (scale * 625), h, processPaint);
 				h += (scale * 17);
-			}
-			for (int i = 0; i < 23 && i < old_apps.length; i++) {
-				String[] toks = old_apps[i].split(";");
-				if (!list.contains(new Integer(toks[1]))) {
-					c.drawText(toks[0], mPixels + (scale * 548), h,
-							processPaint);
-					c.drawText(toks[1], mPixels + (scale * 575), h,
-							processPaint);
-					c.drawText(toks[2], mPixels + (scale * 625), h,
-							processPaint);
-					h += (scale * 17);
-				}
 			}
 		}
 
 		void drawText(Canvas c) {
-			long up = statsThread.getUptime();
-			int reading = statsThread.getUsage();
-			int days = (int) (up / 86400);
-			int hours = (int) ((up % 86400) / 3600);
-			int minutes = (int) (((up % 86400) % 3600) / 60);
-			int seconds = (int) (((up % 86400) % 3600) % 60);
-			String sReading = "000";
-			if (reading < 10) {
-				sReading = "00" + String.valueOf(reading);
-			} else if (reading < 100) {
-				sReading = "0" + String.valueOf(reading);
-			} else {
-				sReading = "100";
-			}
-			String dur = "DUR";
-			String sd = "SD";
-			String sDays = (days < 10) ? "0" + String.valueOf(days) : String
-					.valueOf(days);
-			String sHours = (hours < 10) ? "0" + String.valueOf(hours) : String
-					.valueOf(hours);
-			String sMins = (minutes < 10) ? "0" + String.valueOf(minutes)
-					: String.valueOf(minutes);
-			String sSecs = (seconds < 10) ? "0" + String.valueOf(seconds)
-					: String.valueOf(seconds);
-			String sTmonth = (DateCalc.getMonth()) < 10 ? "0"
-					+ String.valueOf(DateCalc.getMonth()) : String
-					.valueOf(DateCalc.getMonth());
-			String sThours = (DateCalc.getHours() < 10) ? "0"
-					+ String.valueOf(DateCalc.getHours()) : String
-					.valueOf(DateCalc.getHours());
-			String sTerran = String.valueOf(DateCalc.getYear()) + sTmonth + "."
-					+ String.valueOf(DateCalc.getDecDay());
-			String sTTC = String.valueOf(DateCalc.getDaysToFirstContact());
-			c.drawText(sReading + "%", mPixels + (scale * 367), (scale * 200),
-					usagePaint);
+
+			c.drawText(statsThread.getUsage() + "%", mPixels + (scale * 367),
+					(scale * 200), usagePaint);
 			// c.drawText(dur + " " + sDays + " " + sHours + ":" + sMins + ":" +
 			// sSecs, mPixels + 222, 69, ulPaint);
-			c.drawText(dur, mPixels + (scale * 87), (scale * 46), uptimePaint);
-			c.drawText(sDays, mPixels + (scale * 107), (scale * 46),
-					uptimePaint);
-			c.drawText(sHours + ":" + sMins + ":" + sSecs, mPixels
-					+ (scale * 160), (scale * 46), uptimePaint);
-			c.drawText(sd, mPixels + (scale * 87), (scale * 63), uptimePaint);
+			c.drawText("DUR", mPixels + (scale * 87), (scale * 46), uptimePaint);
+			c.drawText(statsThread.getUpDays(), mPixels + (scale * 107),
+					(scale * 46), uptimePaint);
+			c.drawText(statsThread.getUpHours() + ":" + statsThread.getUpMins()
+					+ ":" + statsThread.getUpSecs(), mPixels + (scale * 160),
+					(scale * 46), uptimePaint);
+			c.drawText("SD", mPixels + (scale * 87), (scale * 63), uptimePaint);
 			c.drawText("--", mPixels + (scale * 107), (scale * 63), uptimePaint);
 			c.drawText(String.valueOf(DateCalc.stardate()), mPixels
 					+ (scale * 160), (scale * 63), uptimePaint);
 			c.drawText("TER", mPixels + (scale * 87), (scale * 81), uptimePaint);
-			c.drawText(sThours, mPixels + (scale * 107), (scale * 81),
-					uptimePaint);
-			c.drawText(sTerran, mPixels + (scale * 160), (scale * 81),
-					uptimePaint);
+			c.drawText(statsThread.gettHours(), mPixels + (scale * 107),
+					(scale * 81), uptimePaint);
+			c.drawText(statsThread.gettDate(), mPixels + (scale * 160),
+					(scale * 81), uptimePaint);
 			c.drawText("TTC", mPixels + (scale * 87), (scale * 98), uptimePaint);
 			c.drawText("--", mPixels + (scale * 107), (scale * 98), uptimePaint);
-			c.drawText(sTTC, mPixels + (scale * 160), (scale * 98), uptimePaint);
+			c.drawText(statsThread.getsTTC(), mPixels + (scale * 160),
+					(scale * 98), uptimePaint);
 
 		}
 

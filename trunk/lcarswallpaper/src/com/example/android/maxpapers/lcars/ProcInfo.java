@@ -22,7 +22,7 @@ public class ProcInfo {
 	 * 
 	 * @return String[] processName;pid;memory
 	 */
-	public String[] getServiceInfo() {
+	public Process[] getServiceInfo() {
 		return getServiceInfo(100);
 	}
 
@@ -35,7 +35,7 @@ public class ProcInfo {
 	 *            less, or *unlikely* an empty array.
 	 * @return String[] processName;pid;memory
 	 */
-	public String[] getServiceInfo(int count) {
+	public Process[] getServiceInfo(int count) {
 
 		List<RunningServiceInfo> services = activityManager
 				.getRunningServices(count);
@@ -58,19 +58,16 @@ public class ProcInfo {
 		RunningServiceInfo[] aSvcs = services.toArray(new RunningServiceInfo[services
 				.size()]);
 		MemoryInfo[] memInfos = activityManager.getProcessMemoryInfo(aPids);
-		String[] allInfo = new String[memInfos.length];
+		Process[] allInfo = new Process[memInfos.length];
 		//Build running services array of parsable strings
 		for (int i = 0; i < memInfos.length; i++) {
 			String procName = aSvcs[i].process;
 			if (procName.length() > 16) {
 				procName = "..." + procName.substring(procName.length() - 13);
 			}
-			allInfo[i] = procName
-					+ ";"
-					+ aSvcs[i].pid
-					+ ";"
-					+ String.valueOf((memInfos[i].dalvikPss
-							+ memInfos[i].nativePss + memInfos[i].otherPss));
+			allInfo[i] = new Process(aSvcs[i].pid, procName, memInfos[i].dalvikPss
+					+ memInfos[i].nativePss + memInfos[i].otherPss);
+
 		}
 		return allInfo;
 
@@ -82,7 +79,7 @@ public class ProcInfo {
 	 * 
 	 * @return String[] processName;pid;memory
 	 **/
-	public String[] getAppInfo() {
+	public Process[] getAppInfo() {
 
 		List<RunningAppProcessInfo> processes = activityManager
 				.getRunningAppProcesses();
@@ -105,19 +102,16 @@ public class ProcInfo {
 			aPids[i] = aIpids[i].intValue();
 		}
 		MemoryInfo[] memInfos = activityManager.getProcessMemoryInfo(aPids);
-		String[] allInfo = new String[memInfos.length];
+		Process[] allInfo = new Process[memInfos.length];
 		//Build running services array of parsable strings
 		for (int i = 0; i < memInfos.length; i++) {
 			String procName = aSvcs[i].processName;
 			if (procName.length() > 16) {
 				procName = "..." + procName.substring(procName.length() - 13);
 			}
-			allInfo[i] = procName
-					+ ";"
-					+ aSvcs[i].pid
-					+ ";"
-					+ String.valueOf((memInfos[i].dalvikPss
-							+ memInfos[i].nativePss + memInfos[i].otherPss));
+			allInfo[i] = new Process(aSvcs[i].pid, procName, memInfos[i].dalvikPss
+					+ memInfos[i].nativePss + memInfos[i].otherPss);
+
 		}
 		return allInfo;
 
