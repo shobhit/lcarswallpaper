@@ -1,4 +1,6 @@
 == 1.0.x ==
+  * Implemented hashCode() to prevent display of duplicate services/apps
+  * Moved several calculations into threads, out of UI thread
   * Improved thread code (using java.util.concurrent.Semaphore - thanks Dave!)
   * CAUTION graphic when battery hits 20%
   * larger font for deuterium status
