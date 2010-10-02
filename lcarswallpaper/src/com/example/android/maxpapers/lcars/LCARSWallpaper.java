@@ -307,16 +307,12 @@ public class LCARSWallpaper extends WallpaperService {
 			super.onTouchEvent(event);
 		}
 
-		void drawFrame() {
-			drawFrame(true);
-		}
-
 		/*
 		 * Draw one frame of the animation. This method gets called repeatedly
 		 * by posting a delayed Runnable. You can do any drawing you want in
 		 * here. This example draws a wireframe cube.
 		 */
-		void drawFrame(boolean positionChanged) {
+		void drawFrame() {
 			final SurfaceHolder holder = getSurfaceHolder();
 
 			Canvas c = null;
@@ -324,11 +320,7 @@ public class LCARSWallpaper extends WallpaperService {
 				c = holder.lockCanvas();
 				if (c != null) {
 					// draw something
-					if (positionChanged) {
-						drawBitmap(c);
-					}
-					// drawCube(c);
-					// drawTouchPoint(c);
+					drawBitmap(c);
 					if (isPortrait) {
 						if (bCaution)
 							drawCaution(c);
