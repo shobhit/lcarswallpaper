@@ -1,4 +1,5 @@
 == 1.0.x ==
+  * Touch "SECURITY" to cycle ship schematics ((c) Star Trek Fact Files)
   * Implemented hashCode() to prevent display of duplicate services/apps
   * Moved several calculations into threads, out of UI thread
   * Improved thread code (using java.util.concurrent.Semaphore - thanks Dave!)
