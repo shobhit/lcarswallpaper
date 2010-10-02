@@ -33,6 +33,7 @@ public abstract class AbstractThread extends Thread {
 	 * onSurfaceDestroy() methods.
 	 */
 	public final void stopThread() {
+		semaphore.release();
 		this.run.set(false);
 
 	}
