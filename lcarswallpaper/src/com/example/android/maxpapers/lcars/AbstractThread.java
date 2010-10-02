@@ -13,17 +13,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class AbstractThread extends Thread {
 	protected AtomicBoolean run;
 	protected AtomicBoolean pause;
-	private Semaphore semaphore = new Semaphore(0);  //semaphore with a single permit
+	private Semaphore semaphore;  //semaphore with a single permit
 
 	protected int poll;
 
 	/**
 	 * Create a thread and set the polling (wait time between executions) 
-	 * @param poll TIme to wait in milliseconds between calls to doWork()
+	 * @param poll Time to wait in milliseconds between calls to doWork()
 	 */
 	public AbstractThread(int poll) {
 		pause = new AtomicBoolean(false);
 		run = new AtomicBoolean();
+		semaphore = new Semaphore(1);
 		this.poll = poll;
 	}
 
@@ -33,7 +34,6 @@ public abstract class AbstractThread extends Thread {
 	 */
 	public final void stopThread() {
 		this.run.set(false);
-		semaphore.release();
 
 	}
 
@@ -52,7 +52,8 @@ public abstract class AbstractThread extends Thread {
 	 * Resumes the thread.  Call this in your onVisibilityChanged() method.
 	 */
 	public final void resumeThread() {
-		semaphore.release();
+		if (semaphore.availablePermits() < 1)
+			semaphore.release();
 	}
 
 	@Override
