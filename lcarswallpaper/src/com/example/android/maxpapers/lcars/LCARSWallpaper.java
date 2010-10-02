@@ -11,6 +11,8 @@
 
 package com.example.android.maxpapers.lcars;
 
+import com.example.android.maxpapers.R;
+
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -34,12 +36,16 @@ import android.view.SurfaceHolder;
  */
 public class LCARSWallpaper extends WallpaperService {
 
+	private int[] ships = { R.drawable.lcars, R.drawable.lcars_constitution,
+			R.drawable.lcars_defiant, R.drawable.lcars_galaxy_refit,
+			R.drawable.lcars_krenim };
 	private final Handler mHandler = new Handler();
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
 	private final float TEXT_SMALL = 12f;
 	private final int CAUTION_FR = 100;
 	private final int NORMAL_FR = 1000;
+	private final int DEFAULT_BACKGROUND = 0;
 
 	@Override
 	public void onCreate() {
@@ -83,6 +89,8 @@ public class LCARSWallpaper extends WallpaperService {
 		private String eV;
 		private String status;
 		private int framerate = 1000;
+		private int background = DEFAULT_BACKGROUND;
+		private Resources res;
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
@@ -128,9 +136,8 @@ public class LCARSWallpaper extends WallpaperService {
 		CubeEngine() {
 			registerReceiver(batteryReceiver, new IntentFilter(
 					Intent.ACTION_BATTERY_CHANGED));
-			Resources res = getResources();
-			lcars = BitmapFactory.decodeResource(res,
-					com.example.android.maxpapers.R.drawable.lcars);
+			res = getResources();
+			lcars = BitmapFactory.decodeResource(res, ships[DEFAULT_BACKGROUND]);
 			deuterium = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.deuterium);
 			caution = BitmapFactory.decodeResource(res,
@@ -142,7 +149,7 @@ public class LCARSWallpaper extends WallpaperService {
 					10000);
 			statsThread = new StatsThread(1000);
 			electronThread = new ElectronCalcThread(0, scale, 33);
-			//electronThread.pauseThread();
+			// electronThread.pauseThread();
 			// Create a Paint to draw the lines for our cube
 			final Paint paint = bitmapPaint;
 			final Paint text_paint = usagePaint;
@@ -290,6 +297,7 @@ public class LCARSWallpaper extends WallpaperService {
 			if (event.getAction() == MotionEvent.ACTION_DOWN) {
 				mTouchX = event.getX();
 				mTouchY = event.getY();
+				// WARP EF button
 				if (mTouchX >= mPixels + (487 * scale)
 						&& mTouchX <= mPixels + (577 * scale)
 						&& mTouchY >= (141 * scale) && mTouchY <= (164 * scale)) {
@@ -304,12 +312,25 @@ public class LCARSWallpaper extends WallpaperService {
 						framerate = 1000;
 						electronThread.pauseThread();
 					}
-					// Reschedule the next redraw
-					mHandler.removeCallbacks(mDrawCube);
-					if (mVisible) {
-						mHandler.post(mDrawCube);
-					}
 				}
+				// SECURITY button
+				if (mTouchX >= mPixels + (4 / 1.5 * scale)
+						&& mTouchX <= mPixels + (88 / 1.5 * scale)
+						&& mTouchY >= (291 / 1.5 * scale)
+						&& mTouchY <= (366 / 1.5 * scale)) {
+					background++;
+					if (background >= ships.length) {
+						background = DEFAULT_BACKGROUND;
+					}
+					lcars = BitmapFactory.decodeResource(res, ships[background]);
+
+				}
+				// Reschedule the next redraw
+				mHandler.removeCallbacks(mDrawCube);
+				if (mVisible) {
+					mHandler.post(mDrawCube);
+				}
+
 			} else {
 				mTouchX = -1;
 				mTouchY = -1;
