@@ -142,7 +142,7 @@ public class LCARSWallpaper extends WallpaperService {
 					10000);
 			statsThread = new StatsThread(1000);
 			electronThread = new ElectronCalcThread(0, scale, 33);
-			electronThread.pauseThread();
+			//electronThread.pauseThread();
 			// Create a Paint to draw the lines for our cube
 			final Paint paint = bitmapPaint;
 			final Paint text_paint = usagePaint;
@@ -249,6 +249,7 @@ public class LCARSWallpaper extends WallpaperService {
 			memThread.start();
 			statsThread.start();
 			electronThread.start();
+			electronThread.pauseThread();
 		}
 
 		@Override
