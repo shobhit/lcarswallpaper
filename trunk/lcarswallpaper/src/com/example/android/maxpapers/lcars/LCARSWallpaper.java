@@ -24,6 +24,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.BatteryManager;
 import android.os.Handler;
@@ -36,9 +37,7 @@ import android.view.SurfaceHolder;
  */
 public class LCARSWallpaper extends WallpaperService {
 
-	private int[] ships = { R.drawable.lcars, R.drawable.lcars_constitution,
-			R.drawable.lcars_defiant, R.drawable.lcars_galaxy_refit,
-			R.drawable.lcars_krenim };
+	private int[] ships = { R.drawable.caution_black, R.drawable.galaxy_dorsal };
 	private final Handler mHandler = new Handler();
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
@@ -64,6 +63,8 @@ public class LCARSWallpaper extends WallpaperService {
 
 	class CubeEngine extends Engine {
 		final float scale = getResources().getDisplayMetrics().density;
+		final int wallWidth = getResources().getDisplayMetrics().widthPixels * 2;
+		final int wallHeight = getResources().getDisplayMetrics().heightPixels;
 		private final int MAX_MODE = 1;
 		private final Paint bitmapPaint = new Paint();
 		private final Paint usagePaint = new Paint();
@@ -90,7 +91,10 @@ public class LCARSWallpaper extends WallpaperService {
 		private String status;
 		private int framerate = 1000;
 		private int background = DEFAULT_BACKGROUND;
+		private Rect shipRect = new Rect();
+		private Rect shipFrame = new Rect();
 		private Resources res;
+		private float zoom;
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
@@ -137,18 +141,18 @@ public class LCARSWallpaper extends WallpaperService {
 			registerReceiver(batteryReceiver, new IntentFilter(
 					Intent.ACTION_BATTERY_CHANGED));
 			res = getResources();
-			lcars = BitmapFactory.decodeResource(res, ships[DEFAULT_BACKGROUND]);
+			ship = BitmapFactory.decodeResource(res, ships[background]);
+			lcars = BitmapFactory.decodeResource(res, R.drawable.lcars);
+			// lcars = Bitmap.createScaledBitmap(lcars, wallWidth, wallHeight,
+			// true);
 			deuterium = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.deuterium);
 			caution = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.caution);
 			lcars_land = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
-			memThread = new MemoryThread(
-					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
-					10000);
-			statsThread = new StatsThread(1000);
-			electronThread = new ElectronCalcThread(0, scale, 33);
+
+			zoom = 1.0f;
 			// electronThread.pauseThread();
 			// Create a Paint to draw the lines for our cube
 			final Paint paint = bitmapPaint;
@@ -199,6 +203,12 @@ public class LCARSWallpaper extends WallpaperService {
 			paint.setStrokeCap(Paint.Cap.ROUND);
 			paint.setStyle(Paint.Style.STROKE);
 			mode = 0;
+
+			memThread = new MemoryThread(
+					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
+					10000);
+			statsThread = new StatsThread(1000);
+			electronThread = new ElectronCalcThread(0, scale, 33);
 
 		}
 
@@ -285,6 +295,11 @@ public class LCARSWallpaper extends WallpaperService {
 				float yStep, int xPixels, int yPixels) {
 			mPixels = xPixels;
 			electronThread.setmPixels(mPixels);
+			int frameX1 = new Double((100 / 1.5 * scale) + mPixels).intValue();
+			int frameX2 = new Double((625 / 1.5 * scale) + mPixels).intValue();
+			int frameY1 = new Double((256 / 1.5 * scale)).intValue();
+			int frameY2 = new Double((760 / 1.5 * scale)).intValue();
+			shipFrame.set(frameX1, frameY1, frameX2, frameY2);
 			drawFrame();
 		}
 
@@ -319,12 +334,24 @@ public class LCARSWallpaper extends WallpaperService {
 						&& mTouchY >= (291 / 1.5 * scale)
 						&& mTouchY <= (366 / 1.5 * scale)) {
 					background++;
+					zoom = 1.0f;
 					if (background >= ships.length) {
 						background = DEFAULT_BACKGROUND;
+						ship.recycle();
+					} else {
+						ship.recycle();
+
+						ship = BitmapFactory.decodeResource(res,
+								ships[background]);
 					}
-					lcars = BitmapFactory.decodeResource(res, ships[background]);
 
 				}
+
+				if (shipFrame.contains(new Float(mTouchX).intValue(),
+						new Float(mTouchY).intValue())) {
+					zoom += .1;
+				}
+
 				// Reschedule the next redraw
 				mHandler.removeCallbacks(mDrawCube);
 				if (mVisible) {
@@ -355,6 +382,8 @@ public class LCARSWallpaper extends WallpaperService {
 					if (isPortrait) {
 						if (bCaution)
 							drawCaution(c);
+						if (background > DEFAULT_BACKGROUND)
+							drawShip(c);
 						drawText(c);
 						drawButtonText(c);
 						if (mode == 0) {
@@ -383,6 +412,26 @@ public class LCARSWallpaper extends WallpaperService {
 			} else {
 				c.drawBitmap(lcars, mPixels, 0, bitmapPaint);
 			}
+		}
+
+		void drawShip(Canvas c) {
+			int shipHeight = ship.getHeight();
+			int shipWidth = ship.getWidth();
+			int frameWidth = shipFrame.right - shipFrame.left;
+			int frameHeight = shipFrame.bottom - shipFrame.top;
+			float ratio = (float) frameWidth / (float) frameHeight;
+			int x1 = (shipWidth / 2 - frameWidth / 2 >= 0) ? shipWidth / 2
+					- frameWidth / 2 : 0;
+			int x2 = (shipWidth / 2 + frameWidth / 2 <= shipWidth) ? shipWidth
+					/ 2 + frameWidth / 2 : shipWidth;
+			int y1 = (shipHeight / 2 - frameHeight / 2 >= 0) ? shipHeight / 2
+					- frameHeight / 2 : 0;
+			int y2 = (shipHeight / 2 + frameHeight / 2 <= shipHeight) ? shipHeight
+					/ 2 + frameHeight / 2
+					: shipHeight;
+			shipRect.set(0, 0, new Float(shipWidth / zoom).intValue(),
+					new Float(shipHeight / ratio / zoom).intValue());
+			c.drawBitmap(ship, shipRect, shipFrame, bitmapPaint);
 		}
 
 		void drawPowerStats(Canvas c) {
@@ -414,15 +463,19 @@ public class LCARSWallpaper extends WallpaperService {
 				c.drawBitmap(deuterium, mPixels + (scale * 487), (scale * 173),
 						bitmapPaint);
 				electronPaint.setColor(0xffffffff);
-				c.drawCircle(electronThread.getX1().floatValue(),
-						electronThread.getY1().floatValue(), 8, electronPaint);
+				c.drawCircle(electronThread.getX1(), electronThread.getY1(), 8,
+						electronPaint);
 				electronPaint.setColor(0xffff9f00);
-				c.drawCircle(electronThread.getX1().floatValue(),
-						electronThread.getY1().floatValue(), 6, electronPaint);
+				c.drawCircle(electronThread.getX1(), electronThread.getY1(), 6,
+						electronPaint);
+				// c.drawPath(LCARSPath.getTopRightCorner(0f, 0f, 50f,
+				// electronThread.getX1(), electronThread.getY1(), 100f),
+				// electronPaint);
 			}
 		}
 
 		private int loop = 0;
+		private Bitmap ship;
 
 		void drawCaution(Canvas c) {
 			if (isPortrait) {
@@ -473,29 +526,43 @@ public class LCARSWallpaper extends WallpaperService {
 
 		void drawText(Canvas c) {
 
-			c.drawText(statsThread.getUsage() + "%", mPixels + (scale * 367),
-					(scale * 200), usagePaint);
-			// c.drawText(dur + " " + sDays + " " + sHours + ":" + sMins + ":" +
-			// sSecs, mPixels + 222, 69, ulPaint);
-			c.drawText("DUR", mPixels + (scale * 87), (scale * 46), uptimePaint);
-			c.drawText(statsThread.getUpDays(), mPixels + (scale * 107),
-					(scale * 46), uptimePaint);
-			c.drawText(statsThread.getUpHours() + ":" + statsThread.getUpMins()
-					+ ":" + statsThread.getUpSecs(), mPixels + (scale * 160),
-					(scale * 46), uptimePaint);
-			c.drawText("SD", mPixels + (scale * 87), (scale * 63), uptimePaint);
-			c.drawText("--", mPixels + (scale * 107), (scale * 63), uptimePaint);
-			c.drawText(String.valueOf(DateCalc.stardate()), mPixels
-					+ (scale * 160), (scale * 63), uptimePaint);
-			c.drawText("TER", mPixels + (scale * 87), (scale * 81), uptimePaint);
-			c.drawText(statsThread.gettHours(), mPixels + (scale * 107),
-					(scale * 81), uptimePaint);
-			c.drawText(statsThread.gettDate(), mPixels + (scale * 160),
-					(scale * 81), uptimePaint);
-			c.drawText("TTC", mPixels + (scale * 87), (scale * 98), uptimePaint);
-			c.drawText("--", mPixels + (scale * 107), (scale * 98), uptimePaint);
-			c.drawText(statsThread.getsTTC(), mPixels + (scale * 160),
-					(scale * 98), uptimePaint);
+			try {
+				c.drawText(statsThread.getUsage() + "%", mPixels
+						+ (scale * 367), (scale * 200), usagePaint);
+				// c.drawText(dur + " " + sDays + " " + sHours + ":" + sMins +
+				// ":" +
+				// sSecs, mPixels + 222, 69, ulPaint);
+				c.drawText("DUR", mPixels + (scale * 87), (scale * 46),
+						uptimePaint);
+				c.drawText(statsThread.getUpDays(), mPixels + (scale * 107),
+						(scale * 46), uptimePaint);
+				c.drawText(
+						statsThread.getUpHours() + ":"
+								+ statsThread.getUpMins() + ":"
+								+ statsThread.getUpSecs(), mPixels
+								+ (scale * 160), (scale * 46), uptimePaint);
+				c.drawText("SD", mPixels + (scale * 87), (scale * 63),
+						uptimePaint);
+				c.drawText("--", mPixels + (scale * 107), (scale * 63),
+						uptimePaint);
+				c.drawText(String.valueOf(DateCalc.stardate()), mPixels
+						+ (scale * 160), (scale * 63), uptimePaint);
+				c.drawText("TER", mPixels + (scale * 87), (scale * 81),
+						uptimePaint);
+				c.drawText(statsThread.gettHours(), mPixels + (scale * 107),
+						(scale * 81), uptimePaint);
+				c.drawText(statsThread.gettDate(), mPixels + (scale * 160),
+						(scale * 81), uptimePaint);
+				c.drawText("TTC", mPixels + (scale * 87), (scale * 98),
+						uptimePaint);
+				c.drawText("--", mPixels + (scale * 107), (scale * 98),
+						uptimePaint);
+				c.drawText(statsThread.getsTTC(), mPixels + (scale * 160),
+						(scale * 98), uptimePaint);
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 
 		}
 

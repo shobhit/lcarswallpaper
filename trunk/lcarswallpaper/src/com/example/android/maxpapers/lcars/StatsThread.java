@@ -4,15 +4,15 @@ public class StatsThread extends AbstractThread {
 
 	private CPULoad cpu = new CPULoad();
 
-	private String usage;
-	private String upDays;
-	private String upHours;
-	private String upMins;
-	private String upSecs;
-	private String tHours;
-	private String tDate;
-	private String sTTC;
-	private String sSpeed;
+	private String usage = "";
+	private String upDays = "";
+	private String upHours = "";
+	private String upMins = "";
+	private String upSecs = "";
+	private String tHours = "";
+	private String tDate = "";
+	private String sTTC = "";
+	private String sSpeed = "";
 
 	public StatsThread(int poll) {
 		super(poll);
