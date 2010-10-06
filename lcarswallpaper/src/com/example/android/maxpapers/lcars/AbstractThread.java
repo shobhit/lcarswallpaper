@@ -1,74 +1,88 @@
 package com.example.android.maxpapers.lcars;
 
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * @author cebarne2
- * A thread that can be paused and resumed.  Uses a semaphore
- * to control execution.  A single method doWork() must be 
- * overriden.  doWork() will be called once each *poll* period. 
- * doWork() loops until the thread is stopped or paused.
+ * @author cebarne2 A thread that can be paused and resumed. A single method
+ *         doWork() must be overriden. doWork() will be called once each *poll*
+ *         period. doWork() loops until the thread is stopped or paused.
  */
 public abstract class AbstractThread extends Thread {
-	protected AtomicBoolean run;
-	protected AtomicBoolean pause;
-	private Semaphore semaphore;  //semaphore with a single permit
-
+	protected boolean run;
+	protected boolean pause;
+	private Lock lockObject;
+	private Condition conditionVariable;
 	protected int poll;
 
 	/**
-	 * Create a thread and set the polling (wait time between executions) 
-	 * @param poll Time to wait in milliseconds between calls to doWork()
+	 * Create a thread and set the polling (wait time between executions)
+	 * 
+	 * @param poll
+	 *            Time to wait in milliseconds between calls to doWork()
 	 */
 	public AbstractThread(int poll) {
-		pause = new AtomicBoolean(false);
-		run = new AtomicBoolean();
-		semaphore = new Semaphore(1);
+		pause = false;
+		lockObject = new ReentrantLock();
+		conditionVariable = lockObject.newCondition();
 		this.poll = poll;
 	}
 
 	/**
-	 * Stops the thread.  Call this in your onDestroy() and 
-	 * onSurfaceDestroy() methods.
+	 * Stops the thread. Call this in your onDestroy() and onSurfaceDestroy()
+	 * methods.
 	 */
 	public final void stopThread() {
-		semaphore.release();
-		this.run.set(false);
-
-	}
-
-	/**
-	 * Pauses the thread.  Call this in your onVisibilityChanged() method.
-	 */
-	public final void pauseThread() {
+		run = false;
+		pause = false;
 		try {
-			semaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+			lockObject.lock();
+			conditionVariable.signal();
+		} finally {
+			lockObject.unlock();
 		}
 	}
 
 	/**
-	 * Resumes the thread.  Call this in your onVisibilityChanged() method.
+	 * Pauses the thread. Call this in your onVisibilityChanged() method.
+	 */
+	public final void pauseThread() {
+		pause = true;
+	}
+
+	/**
+	 * Resumes the thread. Call this in your onVisibilityChanged() method.
 	 */
 	public final void resumeThread() {
-		if (semaphore.availablePermits() < 1)
-			semaphore.release();
+		pause = false;
+		try {
+			lockObject.lock();
+			conditionVariable.signal();
+		} finally {
+			lockObject.unlock();
+		}
 	}
 
 	@Override
 	public final void run() {
-		this.run.set(true);
-		while (run.get()) {
+		run = true;
+		while (run) {
+			if (pause) {
+				try {
+					lockObject.lock();
+					conditionVariable.await();
+				} catch (InterruptedException e) {
+				} finally {
+					lockObject.unlock();
+				}
+			}
+			doStuff();
 			try {
-				semaphore.acquire();
-				doStuff();
-				semaphore.release();
 				sleep(poll);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
 			}
+
 		}
 	}
 
