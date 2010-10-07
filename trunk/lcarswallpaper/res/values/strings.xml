@@ -36,4 +36,21 @@
     
     
 <string name="description">Don\'t be a red shirt...  use the LCARS wallpaper!</string>
+
+
+<string-array name="galaxy_dorsal"><item>Navigation Light;520;177;540;217</item>
+<item>Main Bridge;353;180;393;206</item>
+<item>Impulse Engine;240;75;260;102</item>
+<item>Impulse Engine;240;286;260;313</item>
+<item>Main Shuttle Bay;282;164;303;224</item>
+<item>Warp Nacell;5;278;165;320</item><item>Warp Nacell;5;66;165;109</item>
+<item>Bussard Collector;177;72;209;104</item>
+<item>Bussard Collector;177;283;209;315</item>
+<item>Photon Torpedo Bay;48;193</item>
+<item>Phaser Array;40;209</item>
+<item>Phaser Array;40;181</item>
+<item>Bussard Ram Scoop;167;71;178;106</item>
+<item>Bussard Ram Scoop;167;282;178;317</item>
+</string-array>
+<string name="galaxy_dorsal">Federation Galaxy Class</string>
 </resources>
