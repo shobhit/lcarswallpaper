@@ -37,7 +37,10 @@ import android.view.SurfaceHolder;
  */
 public class LCARSWallpaper extends WallpaperService {
 
-	private int[] ships = { R.drawable.caution_black, R.drawable.galaxy_dorsal };
+	private int[] ships = { R.drawable.caution_black,
+			R.drawable.galaxy_dorsal_ship_540 };
+	private int[] ships_spots = { 0, R.array.galaxy_dorsal };
+	private int[] ships_names = { 0, R.string.galaxy_dorsal };
 	private final Handler mHandler = new Handler();
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
@@ -73,6 +76,7 @@ public class LCARSWallpaper extends WallpaperService {
 		private final Paint processPaint = new Paint();
 		private final Paint powerPaint = new Paint();
 		private final Paint electronPaint = new Paint();
+		private final Paint hotspotPaint = new Paint();
 		private float mPixels;
 		private float mTouchX;
 		private float mTouchY;
@@ -94,7 +98,6 @@ public class LCARSWallpaper extends WallpaperService {
 		private Rect shipRect = new Rect();
 		private Rect shipFrame = new Rect();
 		private Resources res;
-		private float zoom;
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
@@ -152,7 +155,6 @@ public class LCARSWallpaper extends WallpaperService {
 			lcars_land = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
 
-			zoom = 1.0f;
 			// electronThread.pauseThread();
 			// Create a Paint to draw the lines for our cube
 			final Paint paint = bitmapPaint;
@@ -162,12 +164,17 @@ public class LCARSWallpaper extends WallpaperService {
 			final Paint p_paint = processPaint;
 			final Paint e_paint = electronPaint;
 			final Paint w_paint = powerPaint;
+			final Paint h_paint = hotspotPaint;
 			Typeface font = Typeface.createFromAsset(getAssets(),
 					"swiss_ec.ttf");
 			text_paint.setTypeface(font);
 			text_paint.setTextSize(scale * TEXT_LARGE);
 			text_paint.setColor(0xffff9f00);
 			text_paint.setAntiAlias(true);
+			h_paint.setTypeface(font);
+			h_paint.setTextSize(scale * TEXT_SMALL);
+			h_paint.setColor(0xffcf6060); // reddish
+			h_paint.setAntiAlias(true);
 			ul_paint.setTypeface(font);
 			ul_paint.setTextSize(scale * TEXT_MEDIUM);
 			ul_paint.setColor(0xffff9f00);
@@ -293,12 +300,20 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
+			float diff = xPixels - mPixels;
 			mPixels = xPixels;
+
 			electronThread.setmPixels(mPixels);
 			int frameX1 = new Double((100 / 1.5 * scale) + mPixels).intValue();
 			int frameX2 = new Double((625 / 1.5 * scale) + mPixels).intValue();
 			int frameY1 = new Double((256 / 1.5 * scale)).intValue();
 			int frameY2 = new Double((760 / 1.5 * scale)).intValue();
+			if (hotSpot != null && hotSpotDraw != null) {
+				hotSpot.hotspot.left = new Float(hotSpot.hotspot.left + diff)
+						.intValue();
+				hotSpot.hotspot.right = new Float(hotSpot.hotspot.right + diff)
+						.intValue();
+			}
 			shipFrame.set(frameX1, frameY1, frameX2, frameY2);
 			drawFrame();
 		}
@@ -334,7 +349,6 @@ public class LCARSWallpaper extends WallpaperService {
 						&& mTouchY >= (291 / 1.5 * scale)
 						&& mTouchY <= (366 / 1.5 * scale)) {
 					background++;
-					zoom = 1.0f;
 					if (background >= ships.length) {
 						background = DEFAULT_BACKGROUND;
 						ship.recycle();
@@ -346,12 +360,11 @@ public class LCARSWallpaper extends WallpaperService {
 					}
 
 				}
-
+				// ship hotspot
 				if (shipFrame.contains(new Float(mTouchX).intValue(),
 						new Float(mTouchY).intValue())) {
-					zoom += .1;
+					shipFrameTouch();
 				}
-
 				// Reschedule the next redraw
 				mHandler.removeCallbacks(mDrawCube);
 				if (mVisible) {
@@ -363,6 +376,54 @@ public class LCARSWallpaper extends WallpaperService {
 				mTouchY = -1;
 			}
 			super.onTouchEvent(event);
+		}
+
+		private void shipFrameTouch() {
+			hotSpot = null;
+			hotSpotDraw = null;
+			if (background > 0) {
+				String[] hotspots = res.getStringArray(ships_spots[background]);
+				for (int i = 0; i < hotspots.length; i++) {
+					String[] toks = hotspots[i].split(";");
+					Rect spot = new Rect();
+					String name = toks[0];
+					int x = Integer.parseInt(toks[1]);
+					int y = Integer.parseInt(toks[2]);
+					if (toks.length < 5) {
+						spot.set(
+								new Double(((x - 6) / 1.5) * scale + mPixels
+										+ (shipFrame.left - mPixels))
+										.intValue(),
+								new Double((y / 1.5) * scale - (6 * scale))
+										.intValue() + shipFrame.top,
+								new Double((x / 1.5) * scale + (6 * scale)
+										+ mPixels + (shipFrame.left - mPixels))
+										.intValue(), new Double((y / 1.5)
+										* scale + (6 * scale)).intValue()
+										+ shipFrame.top);
+					} else {
+						int x2 = Integer.parseInt(toks[3]);
+						int y2 = Integer.parseInt(toks[4]);
+						spot.set(new Double(((x) / 1.5) * scale + mPixels
+								+ (shipFrame.left - mPixels)).intValue(),
+								new Double((y / 1.5) * scale).intValue()
+										+ shipFrame.top, new Double((x2 / 1.5)
+										* scale + mPixels
+										+ (shipFrame.left - mPixels))
+										.intValue(), new Double((y2 / 1.5)
+										* scale).intValue()
+										+ shipFrame.top);
+
+					}
+					if (spot.contains(new Float(mTouchX).intValue(), new Float(
+							mTouchY).intValue())) {
+						hotSpot = new ShipHotSpot(new Rect(spot.left, spot.top,
+								spot.right, spot.bottom), name);
+						hotSpotDraw = new ShipHotSpot(new Rect(spot.left,
+								spot.top, spot.right, spot.bottom), name);
+					}
+				}
+			}
 		}
 
 		/*
@@ -417,20 +478,29 @@ public class LCARSWallpaper extends WallpaperService {
 		void drawShip(Canvas c) {
 			int shipHeight = ship.getHeight();
 			int shipWidth = ship.getWidth();
-			int frameWidth = shipFrame.right - shipFrame.left;
-			int frameHeight = shipFrame.bottom - shipFrame.top;
-			float ratio = (float) frameWidth / (float) frameHeight;
-			int x1 = (shipWidth / 2 - frameWidth / 2 >= 0) ? shipWidth / 2
-					- frameWidth / 2 : 0;
-			int x2 = (shipWidth / 2 + frameWidth / 2 <= shipWidth) ? shipWidth
-					/ 2 + frameWidth / 2 : shipWidth;
-			int y1 = (shipHeight / 2 - frameHeight / 2 >= 0) ? shipHeight / 2
-					- frameHeight / 2 : 0;
-			int y2 = (shipHeight / 2 + frameHeight / 2 <= shipHeight) ? shipHeight
-					/ 2 + frameHeight / 2
-					: shipHeight;
-			shipRect.set(0, 0, new Float(shipWidth / zoom).intValue(),
-					new Float(shipHeight / ratio / zoom).intValue());
+			float ratio = (float) shipWidth / (float) shipHeight;
+			float frameWidth = (540 / 1.5f) * scale;
+			float frameHeight = frameWidth / ratio;
+			shipRect.right = shipRect.left + shipWidth;
+			shipRect.bottom = shipRect.top + shipHeight;
+			shipFrame.right = shipFrame.left + new Float(frameWidth).intValue();
+			shipFrame.bottom = shipFrame.top
+					+ new Float(frameHeight).intValue();
+			hotspotPaint.setColor(0xffFF9F00); // yellowish
+			hotspotPaint.setTextSize(scale * TEXT_MEDIUM);
+			c.drawText(res.getString(ships_names[background]),
+					shipFrame.left, shipFrame.top, hotspotPaint);
+			if (hotSpot != null) {
+				hotspotPaint.setColor(0xff9f9fff); // blueish
+				hotspotPaint.setTextSize(scale * TEXT_SMALL);
+				c.drawText(hotSpot.name, shipFrame.left, shipFrame.top
+						+ (TEXT_MEDIUM * scale), hotspotPaint);
+				hotspotPaint.setColor(0xffcf6060); // reddish
+				c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
+						hotSpot.hotspot.right, hotSpot.hotspot.bottom,
+						hotspotPaint);
+			}
+
 			c.drawBitmap(ship, shipRect, shipFrame, bitmapPaint);
 		}
 
@@ -476,6 +546,8 @@ public class LCARSWallpaper extends WallpaperService {
 
 		private int loop = 0;
 		private Bitmap ship;
+		private ShipHotSpot hotSpot;
+		private ShipHotSpot hotSpotDraw;
 
 		void drawCaution(Canvas c) {
 			if (isPortrait) {
