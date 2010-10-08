@@ -4,9 +4,9 @@
   * Stability tested on Moto Droid
   * Touch various areas of ship schematics to display description
   * Touch "SECURITY" to cycle ship schematics ((c) L Tanganho)
-  ** Galaxy
-  ** Excelsior
-  ** B'Rel
+    * Galaxy class schematic
+    * Excelsior class schematic
+    * B'Rel class schematic
   * Implemented hashCode() to prevent display of duplicate services/apps
   * Moved several calculations into new threads, out of UI thread
   * Improved thread code (using java.util.concurrent - thanks Dave!)
