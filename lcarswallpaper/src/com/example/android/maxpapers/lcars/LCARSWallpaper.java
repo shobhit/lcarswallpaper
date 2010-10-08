@@ -24,6 +24,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.BatteryManager;
@@ -37,10 +39,9 @@ import android.view.SurfaceHolder;
  */
 public class LCARSWallpaper extends WallpaperService {
 
-	private int[] ships = { R.drawable.caution_black,
-			R.drawable.galaxy_dorsal_ship_540 };
-	private int[] ships_spots = { 0, R.array.galaxy_dorsal };
-	private int[] ships_names = { 0, R.string.galaxy_dorsal };
+	private int[] ships = { 0, R.drawable.galaxy_dorsal, R.drawable.excelsior, R.drawable.birdofprey };
+	private int[] ships_spots = { 0, R.array.galaxy_dorsal, R.array.excelsior, R.array.birdofprey };
+	private int[] ships_names = { 0, R.string.galaxy_dorsal, R.string.excelsior, R.string.birdofprey };
 	private final Handler mHandler = new Handler();
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
@@ -308,7 +309,7 @@ public class LCARSWallpaper extends WallpaperService {
 			int frameX2 = new Double((625 / 1.5 * scale) + mPixels).intValue();
 			int frameY1 = new Double((256 / 1.5 * scale)).intValue();
 			int frameY2 = new Double((760 / 1.5 * scale)).intValue();
-			if (hotSpot != null && hotSpotDraw != null) {
+			if (hotSpot != null) {
 				hotSpot.hotspot.left = new Float(hotSpot.hotspot.left + diff)
 						.intValue();
 				hotSpot.hotspot.right = new Float(hotSpot.hotspot.right + diff)
@@ -349,11 +350,14 @@ public class LCARSWallpaper extends WallpaperService {
 						&& mTouchY >= (291 / 1.5 * scale)
 						&& mTouchY <= (366 / 1.5 * scale)) {
 					background++;
+					hotSpot = null;
 					if (background >= ships.length) {
 						background = DEFAULT_BACKGROUND;
-						ship.recycle();
+						if (ship != null)
+							ship.recycle();
 					} else {
-						ship.recycle();
+						if (ship != null)
+							ship.recycle();
 
 						ship = BitmapFactory.decodeResource(res,
 								ships[background]);
@@ -380,7 +384,6 @@ public class LCARSWallpaper extends WallpaperService {
 
 		private void shipFrameTouch() {
 			hotSpot = null;
-			hotSpotDraw = null;
 			if (background > 0) {
 				String[] hotspots = res.getStringArray(ships_spots[background]);
 				for (int i = 0; i < hotspots.length; i++) {
@@ -419,8 +422,6 @@ public class LCARSWallpaper extends WallpaperService {
 							mTouchY).intValue())) {
 						hotSpot = new ShipHotSpot(new Rect(spot.left, spot.top,
 								spot.right, spot.bottom), name);
-						hotSpotDraw = new ShipHotSpot(new Rect(spot.left,
-								spot.top, spot.right, spot.bottom), name);
 					}
 				}
 			}
@@ -429,7 +430,7 @@ public class LCARSWallpaper extends WallpaperService {
 		/*
 		 * Draw one frame of the animation. This method gets called repeatedly
 		 * by posting a delayed Runnable. You can do any drawing you want in
-		 * here. This example draws a wireframe cube.
+		 * here.
 		 */
 		void drawFrame() {
 			final SurfaceHolder holder = getSurfaceHolder();
@@ -488,20 +489,56 @@ public class LCARSWallpaper extends WallpaperService {
 					+ new Float(frameHeight).intValue();
 			hotspotPaint.setColor(0xffFF9F00); // yellowish
 			hotspotPaint.setTextSize(scale * TEXT_MEDIUM);
-			c.drawText(res.getString(ships_names[background]),
-					shipFrame.left, shipFrame.top, hotspotPaint);
+			c.drawText(res.getString(ships_names[background]), shipFrame.left,
+					shipFrame.top, hotspotPaint);
+			c.drawBitmap(ship, shipRect, shipFrame, bitmapPaint);
 			if (hotSpot != null) {
 				hotspotPaint.setColor(0xff9f9fff); // blueish
 				hotspotPaint.setTextSize(scale * TEXT_SMALL);
-				c.drawText(hotSpot.name, shipFrame.left, shipFrame.top
+				c.drawText(hotSpot.name, new Float(shipFrame.left + (12*scale)).intValue(), shipFrame.top
 						+ (TEXT_MEDIUM * scale), hotspotPaint);
+				drawLabel(new Point(new Float(shipFrame.left + (3*scale)).intValue(), new Float(shipFrame.top
+						+ ((TEXT_MEDIUM/1.5) * scale)).intValue()), new Point(
+						hotSpot.hotspot.centerX(), hotSpot.hotspot.centerY()),
+						c);
 				hotspotPaint.setColor(0xffcf6060); // reddish
-				c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
-						hotSpot.hotspot.right, hotSpot.hotspot.bottom,
-						hotspotPaint);
+//				c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
+//						hotSpot.hotspot.right, hotSpot.hotspot.bottom,
+//						hotspotPaint);
 			}
 
-			c.drawBitmap(ship, shipRect, shipFrame, bitmapPaint);
+		}
+
+		void drawLabel(Point start, Point end, Canvas c) {
+			Path linePath = new Path();
+			Paint linePaint = new Paint(hotspotPaint);
+			//background shadow
+			linePaint.setStyle(Paint.Style.STROKE);
+			linePath.moveTo(start.x, start.y);
+			linePath.lineTo(start.x, end.y - 2 * scale);
+			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale, end.y, start.x + 2 * scale, end.y);
+			linePath.lineTo(end.x, end.y);
+			linePaint.setColor(0x4B000000); // fade
+			linePaint.setStrokeWidth(6 * scale);
+			c.drawPath(linePath, linePaint);
+			linePaint.setStrokeWidth(0);
+			linePaint.setStyle(Paint.Style.FILL);
+			c.drawCircle(start.x, start.y, 6 * scale, linePaint);
+			c.drawCircle(end.x, end.y, 6 * scale, linePaint);
+			
+			//foreground line
+			linePaint.setStyle(Paint.Style.STROKE);
+			linePath.moveTo(start.x, start.y);
+			linePath.lineTo(start.x, end.y - 2 * scale);
+			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale, end.y, start.x + 2 * scale, end.y);
+			linePath.lineTo(end.x, end.y);
+			linePaint.setColor(0xff9f9fff); // blueish
+			linePaint.setStrokeWidth(2 * scale);
+			c.drawPath(linePath, linePaint);
+			linePaint.setStrokeWidth(0);
+			linePaint.setStyle(Paint.Style.FILL);
+			c.drawCircle(start.x, start.y, 2 * scale, linePaint);
+			c.drawCircle(end.x, end.y, 2 * scale, linePaint);
 		}
 
 		void drawPowerStats(Canvas c) {
@@ -547,7 +584,6 @@ public class LCARSWallpaper extends WallpaperService {
 		private int loop = 0;
 		private Bitmap ship;
 		private ShipHotSpot hotSpot;
-		private ShipHotSpot hotSpotDraw;
 
 		void drawCaution(Canvas c) {
 			if (isPortrait) {
