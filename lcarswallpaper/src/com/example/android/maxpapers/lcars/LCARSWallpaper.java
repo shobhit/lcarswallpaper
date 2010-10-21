@@ -11,8 +11,6 @@
 
 package com.example.android.maxpapers.lcars;
 
-import com.example.android.maxpapers.R;
-
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -34,14 +32,19 @@ import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 
+import com.example.android.maxpapers.R;
+
 /*
  * This animated wallpaper draws a rotating wireframe cube.
  */
 public class LCARSWallpaper extends WallpaperService {
 
-	private int[] ships = { 0, R.drawable.galaxy_dorsal, R.drawable.excelsior, R.drawable.birdofprey };
-	private int[] ships_spots = { 0, R.array.galaxy_dorsal, R.array.excelsior, R.array.birdofprey };
-	private int[] ships_names = { 0, R.string.galaxy_dorsal, R.string.excelsior, R.string.birdofprey };
+	private int[] ships = { 0, R.drawable.galaxy_dorsal, R.drawable.excelsior,
+			R.drawable.birdofprey };
+	private int[] ships_spots = { 0, R.array.galaxy_dorsal, R.array.excelsior,
+			R.array.birdofprey };
+	private int[] ships_names = { 0, R.string.galaxy_dorsal,
+			R.string.excelsior, R.string.birdofprey };
 	private final Handler mHandler = new Handler();
 	private final float TEXT_LARGE = 24f;
 	private final float TEXT_MEDIUM = 16f;
@@ -102,7 +105,7 @@ public class LCARSWallpaper extends WallpaperService {
 
 		private final Runnable mDrawCube = new Runnable() {
 			public void run() {
-				drawFrame();
+				drawFrame(true);
 			}
 		};
 
@@ -216,7 +219,7 @@ public class LCARSWallpaper extends WallpaperService {
 					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
 					10000);
 			statsThread = new StatsThread(1000);
-			electronThread = new ElectronCalcThread(0, scale, 33);
+			electronThread = new ElectronCalcThread(0, scale, 0);
 
 		}
 
@@ -246,7 +249,7 @@ public class LCARSWallpaper extends WallpaperService {
 				if (mode == 1) {
 					electronThread.resumeThread();
 				}
-				drawFrame();
+				drawFrame(true);
 			} else {
 				mHandler.removeCallbacks(mDrawCube);
 				memThread.pauseThread();
@@ -265,7 +268,7 @@ public class LCARSWallpaper extends WallpaperService {
 			if (width > height) {
 				isPortrait = false;
 			}
-			drawFrame();
+			drawFrame(true);
 		}
 
 		@Override
@@ -316,7 +319,7 @@ public class LCARSWallpaper extends WallpaperService {
 						.intValue();
 			}
 			shipFrame.set(frameX1, frameY1, frameX2, frameY2);
-			drawFrame();
+			drawFrame(true);
 		}
 
 		/*
@@ -337,11 +340,9 @@ public class LCARSWallpaper extends WallpaperService {
 						mode = 0;
 					}
 					if (mode == 1) {
-						electronThread.resumeThread();
-						framerate = 100;
+						framerate = 30;
 					} else {
 						framerate = 1000;
-						electronThread.pauseThread();
 					}
 				}
 				// SECURITY button
@@ -432,7 +433,7 @@ public class LCARSWallpaper extends WallpaperService {
 		 * by posting a delayed Runnable. You can do any drawing you want in
 		 * here.
 		 */
-		void drawFrame() {
+		void drawFrame(boolean force) {
 			final SurfaceHolder holder = getSurfaceHolder();
 
 			Canvas c = null;
@@ -456,9 +457,11 @@ public class LCARSWallpaper extends WallpaperService {
 						}
 					}
 				}
+
 			} finally {
 				if (c != null)
 					holder.unlockCanvasAndPost(c);
+
 			}
 
 			// Reschedule the next redraw
@@ -495,16 +498,22 @@ public class LCARSWallpaper extends WallpaperService {
 			if (hotSpot != null) {
 				hotspotPaint.setColor(0xff9f9fff); // blueish
 				hotspotPaint.setTextSize(scale * TEXT_SMALL);
-				c.drawText(hotSpot.name, new Float(shipFrame.left + (12*scale)).intValue(), shipFrame.top
+				c.drawText(hotSpot.name, new Float(shipFrame.left
+						+ (12 * scale)).intValue(), shipFrame.top
 						+ (TEXT_MEDIUM * scale), hotspotPaint);
-				drawLabel(new Point(new Float(shipFrame.left + (3*scale)).intValue(), new Float(shipFrame.top
-						+ ((TEXT_MEDIUM/1.5) * scale)).intValue()), new Point(
-						hotSpot.hotspot.centerX(), hotSpot.hotspot.centerY()),
-						c);
+				drawLabel(
+						new Point(
+								new Float(shipFrame.left + (3 * scale))
+										.intValue(),
+								new Float(shipFrame.top
+										+ ((TEXT_MEDIUM / 1.5) * scale))
+										.intValue()),
+						new Point(hotSpot.hotspot.centerX(), hotSpot.hotspot
+								.centerY()), c);
 				hotspotPaint.setColor(0xffcf6060); // reddish
-//				c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
-//						hotSpot.hotspot.right, hotSpot.hotspot.bottom,
-//						hotspotPaint);
+				// c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
+				// hotSpot.hotspot.right, hotSpot.hotspot.bottom,
+				// hotspotPaint);
 			}
 
 		}
@@ -512,11 +521,12 @@ public class LCARSWallpaper extends WallpaperService {
 		void drawLabel(Point start, Point end, Canvas c) {
 			Path linePath = new Path();
 			Paint linePaint = new Paint(hotspotPaint);
-			//background shadow
+			// background shadow
 			linePaint.setStyle(Paint.Style.STROKE);
 			linePath.moveTo(start.x, start.y);
 			linePath.lineTo(start.x, end.y - 2 * scale);
-			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale, end.y, start.x + 2 * scale, end.y);
+			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale,
+					end.y, start.x + 2 * scale, end.y);
 			linePath.lineTo(end.x, end.y);
 			linePaint.setColor(0x4B000000); // fade
 			linePaint.setStrokeWidth(6 * scale);
@@ -525,12 +535,13 @@ public class LCARSWallpaper extends WallpaperService {
 			linePaint.setStyle(Paint.Style.FILL);
 			c.drawCircle(start.x, start.y, 6 * scale, linePaint);
 			c.drawCircle(end.x, end.y, 6 * scale, linePaint);
-			
-			//foreground line
+
+			// foreground line
 			linePaint.setStyle(Paint.Style.STROKE);
 			linePath.moveTo(start.x, start.y);
 			linePath.lineTo(start.x, end.y - 2 * scale);
-			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale, end.y, start.x + 2 * scale, end.y);
+			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale,
+					end.y, start.x + 2 * scale, end.y);
 			linePath.lineTo(end.x, end.y);
 			linePaint.setColor(0xff9f9fff); // blueish
 			linePaint.setStrokeWidth(2 * scale);
@@ -578,6 +589,7 @@ public class LCARSWallpaper extends WallpaperService {
 				// c.drawPath(LCARSPath.getTopRightCorner(0f, 0f, 50f,
 				// electronThread.getX1(), electronThread.getY1(), 100f),
 				// electronPaint);
+				electronThread.resumeThread(); // calculate next position
 			}
 		}
 
