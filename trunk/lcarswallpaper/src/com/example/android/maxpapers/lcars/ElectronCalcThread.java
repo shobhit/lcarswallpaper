@@ -34,6 +34,7 @@ public class ElectronCalcThread extends AbstractThread {
 				* Math.sin((time % 360) * (Math.PI / 180))).floatValue();
 		x1 = x1a;
 		y1 = y1a;
+		pauseThread();
 	}
 
 	public float getY1() {
