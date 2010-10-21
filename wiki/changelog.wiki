@@ -1,4 +1,4 @@
-== 1.0.x ==
+== 1.0.x (trunk)==
   * Still in development
   * Expect display glitches
   * Stability tested on Moto Droid
