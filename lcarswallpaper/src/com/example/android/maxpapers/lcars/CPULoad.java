@@ -29,16 +29,25 @@ public class CPULoad {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(
 					new FileInputStream("/proc/cpuinfo")), 1000);
 			String load = reader.readLine();
-			load = reader.readLine();
+			boolean found = false;
+			while (!found) {
+				if (load.contains("BogoMIPS")){
+					found = true;
+				} else {
+					load = reader.readLine();
+				}
+			}
 			reader.close();
+			if (load ==null){
+				load = "BogoMIPS\t: 0000";
+			}
+			String[] toks = load.split(":");
 
-			String[] toks = load.split(" ");
-
-			return Float.parseFloat(toks[1]);
+			return Float.parseFloat(toks[1].trim());
 
 		} catch (Exception ex) {
 			return 0.00f;
-		}
+		} 
 	}
 
 	private void readUsage() {
