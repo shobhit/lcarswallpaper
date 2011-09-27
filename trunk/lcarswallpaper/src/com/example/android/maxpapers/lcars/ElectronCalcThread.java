@@ -5,22 +5,14 @@ import java.util.Date;
 public class ElectronCalcThread extends AbstractThread {
 	private float x1;
 	private float y1;
-	private float mPixels;
 
-	public synchronized void setmPixels(float mPixels) {
-		this.mPixels = mPixels;
-	}
+	private float xScale;
+	private float yScale;
 
-	public synchronized void setScale(float scale) {
-		this.scale = scale;
-	}
-
-	private float scale;
-
-	public ElectronCalcThread(float mPixels, float scale, int poll) {
+	public ElectronCalcThread(float xScale, float yScale, int poll) {
 		super(poll);
-		this.mPixels = mPixels;
-		this.scale = scale;
+		this.xScale = xScale;
+		this.yScale = yScale;
 	}
 
 	@Override
@@ -28,9 +20,9 @@ public class ElectronCalcThread extends AbstractThread {
 		long time = new Date().getTime() / 33;
 		float x1a;
 		float y1a;
-		x1a = new Double(mPixels + (scale * (834 / 1.5)) + (scale * (83 / 1.5))
+		x1a = new Double((xScale * (940)) + (xScale * (83))
 				* Math.cos((time % 360) * (Math.PI / 180))).floatValue();
-		y1a = new Double((scale * (356 / 1.5)) + (scale * (83 / 1.5))
+		y1a = new Double((yScale * (439)) + (yScale * (83))
 				* Math.sin((time % 360) * (Math.PI / 180))).floatValue();
 		x1 = x1a;
 		y1 = y1a;
