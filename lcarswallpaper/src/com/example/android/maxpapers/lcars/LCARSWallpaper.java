@@ -80,8 +80,8 @@ public class LCARSWallpaper extends WallpaperService {
 				.getDesiredMinimumWidth();
 		private int wallHeight = WallpaperManager.getInstance(getBaseContext())
 				.getDesiredMinimumHeight();
-		private final int displayWidth = getResources().getDisplayMetrics().widthPixels * 2;
-		private final int displayHeight = getResources().getDisplayMetrics().heightPixels;
+		private int displayWidth = getResources().getDisplayMetrics().widthPixels * 2;
+		private int displayHeight = getResources().getDisplayMetrics().heightPixels;
 		private int mPixels;
 		private float mTouchX;
 		private float mTouchY;
@@ -198,10 +198,16 @@ public class LCARSWallpaper extends WallpaperService {
 		public void onSurfaceChanged(SurfaceHolder holder, int format,
 				int width, int height) {
 			super.onSurfaceChanged(holder, format, width, height);
-			isPortrait = true;
 			if (width > height) {
 				isPortrait = false;
+
+			} else {
+				isPortrait = true;
+				
 			}
+			displayWidth = holder.getSurfaceFrame().right - holder.getSurfaceFrame().left;
+			displayHeight = holder.getSurfaceFrame().bottom - holder.getSurfaceFrame().top;
+
 			setDimensions();
 			drawFrame();
 		}
@@ -377,9 +383,9 @@ public class LCARSWallpaper extends WallpaperService {
 			// Reschedule the next redraw
 			mHandler.removeCallbacks(drawingThread);
 			if (mVisible) {
-				if (batteryReceiver.isBatteryLow(20)){
+				if (batteryReceiver.isBatteryLow(20)) {
 					framerate = CAUTION_FR;
-				} else if (systemPanelMode == ELECTRON_MODE){
+				} else if (systemPanelMode == ELECTRON_MODE) {
 					framerate = ELECTRON_FR;
 				} else {
 					framerate = NORMAL_FR;
@@ -389,9 +395,13 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		void drawBitmap(Canvas c) {
+			WallpaperManager wm = WallpaperManager.getInstance(getBaseContext());
 			if (!isPortrait) {
-				c.drawBitmap(bitmapLcarsLandscape, mPixels, 0,
-						lcarsPaint.getBitmapPaint());
+				c.drawBitmap(bitmapLcarsLandscape,
+						new Rect(0, 0, bitmapLcarsLandscape.getWidth(),
+								bitmapLcarsLandscape.getHeight()), new Rect(
+								mPixels, 0, wm.getDesiredMinimumWidth() + mPixels,
+								getResources().getDisplayMetrics().heightPixels), lcarsPaint.getBitmapPaint());
 			} else {
 				c.drawBitmap(bitmapMutablePortrait, lcarsRect, wallpaperRect,
 						lcarsPaint.getBitmapPaint());
@@ -424,7 +434,8 @@ public class LCARSWallpaper extends WallpaperService {
 					lcarsPaint.getBitmapPaint());
 			if (hotSpot != null) {
 				lcarsPaint.getHotspotPaint().setColor(0xff9f9fff); // blueish
-				lcarsPaint.getHotspotPaint().setTextSize(LCARSPaint.TEXT_MEDIUM);
+				lcarsPaint.getHotspotPaint()
+						.setTextSize(LCARSPaint.TEXT_MEDIUM);
 				c.drawText(hotSpot.name,
 						new Float(shipDrawFrame.left + 12).intValue(),
 						shipDrawFrame.top + LCARSPaint.TEXT_MEDIUM,
