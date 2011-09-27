@@ -1,7 +1,10 @@
 == 1.0.x (trunk)==
   * Still in development
   * Expect display glitches
-  * Stability tested on Moto Droid
+  * Stability tested on Moto Droid BIONIC
+
+== 1.0.3 ==
+  * Should work on different resolutions now
   * Deuterium electron animation thread now calculates next position only once per frame, gaining a few % of CPU when active
 == 1.0.2 ==
   * Touch various areas of ship schematics to display description
