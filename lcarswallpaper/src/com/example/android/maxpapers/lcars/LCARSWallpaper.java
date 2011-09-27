@@ -12,7 +12,7 @@
 package com.example.android.maxpapers.lcars;
 
 import android.app.ActivityManager;
-import android.content.BroadcastReceiver;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -22,11 +22,11 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.Paint.Style;
 import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.os.BatteryManager;
 import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
@@ -46,9 +46,7 @@ public class LCARSWallpaper extends WallpaperService {
 	private int[] ships_names = { 0, R.string.galaxy_dorsal,
 			R.string.excelsior, R.string.birdofprey };
 	private final Handler mHandler = new Handler();
-	private final float TEXT_LARGE = 24f;
-	private final float TEXT_MEDIUM = 16f;
-	private final float TEXT_SMALL = 12f;
+	private final int ELECTRON_FR = 10;
 	private final int CAUTION_FR = 100;
 	private final int NORMAL_FR = 1000;
 	private final int DEFAULT_BACKGROUND = 0;
@@ -69,158 +67,94 @@ public class LCARSWallpaper extends WallpaperService {
 	}
 
 	class CubeEngine extends Engine {
-		final float scale = getResources().getDisplayMetrics().density;
-		final int wallWidth = getResources().getDisplayMetrics().widthPixels * 2;
-		final int wallHeight = getResources().getDisplayMetrics().heightPixels;
-		private final int MAX_MODE = 1;
-		private final Paint bitmapPaint = new Paint();
-		private final Paint usagePaint = new Paint();
-		private final Paint uptimePaint = new Paint();
-		private final Paint buttonPaint = new Paint();
-		private final Paint processPaint = new Paint();
-		private final Paint powerPaint = new Paint();
-		private final Paint electronPaint = new Paint();
-		private final Paint hotspotPaint = new Paint();
-		private float mPixels;
+		private static final int SHIP_FRAME_TOP = 300;
+		private static final int SHIP_FRAME_LEFT = 110;
+		private static final int ELECTRON_MODE = 1;
+		private static final int PROCESSES_MODE = 0;
+		private static final int MAX_MODE = 1;
+		float scale = getResources().getDisplayMetrics().density;
+		private LCARSPaint lcarsPaint;
+		float xScale;
+		float yScale;
+		private int wallWidth = WallpaperManager.getInstance(getBaseContext())
+				.getDesiredMinimumWidth();
+		private int wallHeight = WallpaperManager.getInstance(getBaseContext())
+				.getDesiredMinimumHeight();
+		private final int displayWidth = getResources().getDisplayMetrics().widthPixels * 2;
+		private final int displayHeight = getResources().getDisplayMetrics().heightPixels;
+		private int mPixels;
 		private float mTouchX;
 		private float mTouchY;
-		private Bitmap lcars;
-		private Bitmap lcars_land;
-		private Bitmap deuterium;
-		private Bitmap caution;
+		private Bitmap bitmapLcarsPortrait;
+		private Bitmap bitmapMutablePortrait;
+		private Bitmap bitmapLcarsLandscape;
+		private Bitmap bitmapDeuterium;
+		private Bitmap bitmapCaution;
 		private MemoryThread memThread;
 		private StatsThread statsThread;
 		private ElectronCalcThread electronThread;
 		private boolean isPortrait;
-		private int mode;
+		private int systemPanelMode;
 		private boolean bCaution = false;
-		private String level;
-		private String eV;
-		private String status;
-		private int framerate = 1000;
+		private int framerate = NORMAL_FR;
 		private int background = DEFAULT_BACKGROUND;
 		private Rect shipRect = new Rect();
 		private Rect shipFrame = new Rect();
-		private Resources res;
+		private Rect shipDrawFrame = new Rect();
+		private Rect lcarsRect;
+		private Rect wallpaperRect = new Rect();
+		private Resources res = getResources();
+		private ShipHotSpot[] screenShipSpots;
+		private ShipHotSpot[] bitmapShipSpots;
 
-		private final Runnable mDrawCube = new Runnable() {
+		private final Runnable drawingThread = new Runnable() {
 			public void run() {
-				drawFrame(true);
+				drawFrame();
 			}
 		};
 
-		private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
-			@Override
-			public void onReceive(Context context, Intent intent) {
-				int iLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
-				level = String.valueOf(iLevel) + "%";
-				bCaution = (iLevel <= 20);
-				framerate = NORMAL_FR;
-				if (bCaution) {
-					framerate = CAUTION_FR;
-				}
-				int s = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
-				switch (s) {
-				case BatteryManager.BATTERY_STATUS_CHARGING:
-					status = "Refilling deuterium";
-					break;
-				case BatteryManager.BATTERY_STATUS_DISCHARGING:
-					status = "Deuterium flow normal";
-					break;
-				case BatteryManager.BATTERY_STATUS_FULL:
-					status = "Deuterium tanks full";
-					break;
-				case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
-					status = "Deuterium refill stopped";
-					break;
-				case BatteryManager.BATTERY_STATUS_UNKNOWN:
-					status = "Deuterium status unknown";
-					break;
-
-				}
-				int i = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
-				eV = String.valueOf(DateCalc.roundToDecimals(i / 1000d, 2));
-			}
-		};
+		private BatteryReceiver batteryReceiver = new BatteryReceiver();
 		private boolean mVisible;
 
 		CubeEngine() {
+			// android.os.Debug.waitForDebugger();
 			registerReceiver(batteryReceiver, new IntentFilter(
 					Intent.ACTION_BATTERY_CHANGED));
-			res = getResources();
-			ship = BitmapFactory.decodeResource(res, ships[background]);
-			lcars = BitmapFactory.decodeResource(res, R.drawable.lcars);
-			// lcars = Bitmap.createScaledBitmap(lcars, wallWidth, wallHeight,
-			// true);
-			deuterium = BitmapFactory.decodeResource(res,
+			bitmapShip = BitmapFactory.decodeResource(res, ships[background]);
+			bitmapLcarsPortrait = BitmapFactory.decodeResource(res,
+					R.drawable.lcars);
+			bitmapMutablePortrait = Bitmap.createBitmap(
+					bitmapLcarsPortrait.getWidth(),
+					bitmapLcarsPortrait.getHeight(),
+					bitmapLcarsPortrait.getConfig());
+			bitmapDeuterium = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.deuterium);
-			caution = BitmapFactory.decodeResource(res,
+			bitmapCaution = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.caution);
-			lcars_land = BitmapFactory.decodeResource(res,
+			bitmapLcarsLandscape = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
-
-			// electronThread.pauseThread();
-			// Create a Paint to draw the lines for our cube
-			final Paint paint = bitmapPaint;
-			final Paint text_paint = usagePaint;
-			final Paint ul_paint = uptimePaint;
-			final Paint b_paint = buttonPaint;
-			final Paint p_paint = processPaint;
-			final Paint e_paint = electronPaint;
-			final Paint w_paint = powerPaint;
-			final Paint h_paint = hotspotPaint;
-			Typeface font = Typeface.createFromAsset(getAssets(),
-					"swiss_ec.ttf");
-			text_paint.setTypeface(font);
-			text_paint.setTextSize(scale * TEXT_LARGE);
-			text_paint.setColor(0xffff9f00);
-			text_paint.setAntiAlias(true);
-			h_paint.setTypeface(font);
-			h_paint.setTextSize(scale * TEXT_SMALL);
-			h_paint.setColor(0xffcf6060); // reddish
-			h_paint.setAntiAlias(true);
-			ul_paint.setTypeface(font);
-			ul_paint.setTextSize(scale * TEXT_MEDIUM);
-			ul_paint.setColor(0xffff9f00);
-			ul_paint.setAntiAlias(true);
-			ul_paint.setTextAlign(Align.RIGHT);
-			b_paint.setTypeface(font);
-			b_paint.setTextSize(scale * TEXT_SMALL);
-			b_paint.setColor(0xff000000);
-			b_paint.setAntiAlias(true);
-			b_paint.setTextAlign(Align.RIGHT);
-
-			e_paint.setColor(0xffff9f00);
-			e_paint.setAntiAlias(true);
-
-			p_paint.setTypeface(font);
-			p_paint.setTextSize(scale * TEXT_SMALL);
-			p_paint.setColor(0xff9f9fff);
-			p_paint.setAntiAlias(true);
-			p_paint.setTextAlign(Align.RIGHT);
-
-			w_paint.setTypeface(font);
-			w_paint.setTextSize(scale * TEXT_MEDIUM);
-			w_paint.setColor(0xff9f9fff);
-			w_paint.setAntiAlias(true);
-			w_paint.setTextAlign(Align.RIGHT);
-
-			// text_paint.setStrokeWidth(2);
-			text_paint.setStrokeCap(Paint.Cap.ROUND);
-			text_paint.setStyle(Paint.Style.STROKE);
-			paint.setColor(0xffffffff);
-			paint.setAntiAlias(true);
-			paint.setStrokeWidth(2);
-			paint.setStrokeCap(Paint.Cap.ROUND);
-			paint.setStyle(Paint.Style.STROKE);
-			mode = 0;
-
+			lcarsRect = new Rect(0, 0, bitmapLcarsPortrait.getWidth(),
+					bitmapLcarsPortrait.getHeight());
+			setDimensions();
+			lcarsPaint = new LCARSPaint(Typeface.createFromAsset(getAssets(),
+					"swiss_ec.ttf"), scale);
+			systemPanelMode = PROCESSES_MODE;
 			memThread = new MemoryThread(
 					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
 					10000);
 			statsThread = new StatsThread(1000);
-			electronThread = new ElectronCalcThread(0, scale, 0);
+			electronThread = new ElectronCalcThread(1, 1, 0);
 
+		}
+
+		private void setDimensions() {
+			if (wallWidth <= 0 || wallHeight <= 0) {
+				wallWidth = displayWidth;
+				wallHeight = displayHeight;
+			}
+			wallpaperRect.set(mPixels, 0, mPixels + wallWidth, wallHeight);
+			xScale = (float) wallWidth / bitmapLcarsPortrait.getWidth();
+			yScale = (float) wallHeight / bitmapLcarsPortrait.getHeight();
 		}
 
 		@Override
@@ -234,7 +168,7 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onDestroy() {
 			super.onDestroy();
-			mHandler.removeCallbacks(mDrawCube);
+			mHandler.removeCallbacks(drawingThread);
 			memThread.stopThread();
 			statsThread.stopThread();
 			electronThread.stopThread();
@@ -246,15 +180,15 @@ public class LCARSWallpaper extends WallpaperService {
 			if (visible) {
 				memThread.resumeThread();
 				statsThread.resumeThread();
-				if (mode == 1) {
+				if (systemPanelMode == ELECTRON_MODE) {
 					electronThread.resumeThread();
 				}
-				drawFrame(true);
+				drawFrame();
 			} else {
-				mHandler.removeCallbacks(mDrawCube);
+				mHandler.removeCallbacks(drawingThread);
 				memThread.pauseThread();
 				statsThread.pauseThread();
-				if (mode == 1) {
+				if (systemPanelMode == ELECTRON_MODE) {
 					electronThread.pauseThread();
 				}
 			}
@@ -268,7 +202,8 @@ public class LCARSWallpaper extends WallpaperService {
 			if (width > height) {
 				isPortrait = false;
 			}
-			drawFrame(true);
+			setDimensions();
+			drawFrame();
 		}
 
 		@Override
@@ -284,7 +219,7 @@ public class LCARSWallpaper extends WallpaperService {
 		public void onSurfaceDestroyed(SurfaceHolder holder) {
 			super.onSurfaceDestroyed(holder);
 			mVisible = false;
-			mHandler.removeCallbacks(mDrawCube);
+			mHandler.removeCallbacks(drawingThread);
 			memThread.stopThread();
 			statsThread.stopThread();
 			electronThread.stopThread();
@@ -304,22 +239,17 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
-			float diff = xPixels - mPixels;
 			mPixels = xPixels;
-
-			electronThread.setmPixels(mPixels);
-			int frameX1 = new Double((100 / 1.5 * scale) + mPixels).intValue();
-			int frameX2 = new Double((625 / 1.5 * scale) + mPixels).intValue();
-			int frameY1 = new Double((256 / 1.5 * scale)).intValue();
-			int frameY2 = new Double((760 / 1.5 * scale)).intValue();
-			if (hotSpot != null) {
-				hotSpot.hotspot.left = new Float(hotSpot.hotspot.left + diff)
-						.intValue();
-				hotSpot.hotspot.right = new Float(hotSpot.hotspot.right + diff)
-						.intValue();
+			shipFrame.set((int) (SHIP_FRAME_LEFT * xScale) + xPixels,
+					(int) (SHIP_FRAME_TOP * yScale),
+					(int) ((SHIP_FRAME_LEFT + shipDrawWidth) * xScale)
+							+ xPixels,
+					(int) ((SHIP_FRAME_TOP + shipDrawHeight) * yScale));
+			if (background > 0) {
+				screenShipSpots = getScreenShipSpots();
+				bitmapShipSpots = getBitmapShipSpots();
 			}
-			shipFrame.set(frameX1, frameY1, frameX2, frameY2);
-			drawFrame(true);
+			drawFrame();
 		}
 
 		/*
@@ -332,48 +262,54 @@ public class LCARSWallpaper extends WallpaperService {
 				mTouchX = event.getX();
 				mTouchY = event.getY();
 				// WARP EF button
-				if (mTouchX >= mPixels + (487 * scale)
-						&& mTouchX <= mPixels + (577 * scale)
-						&& mTouchY >= (141 * scale) && mTouchY <= (164 * scale)) {
-					mode++;
-					if (mode > MAX_MODE) {
-						mode = 0;
-					}
-					if (mode == 1) {
-						framerate = 30;
-					} else {
-						framerate = 1000;
+				if (mTouchX >= mPixels + (821 * xScale)
+						&& mTouchX <= mPixels + (974 * xScale)
+						&& mTouchY >= (238 * yScale)
+						&& mTouchY <= (278 * yScale)) {
+					systemPanelMode++;
+					if (systemPanelMode > MAX_MODE) {
+						systemPanelMode = PROCESSES_MODE;
 					}
 				}
 				// SECURITY button
-				if (mTouchX >= mPixels + (4 / 1.5 * scale)
-						&& mTouchX <= mPixels + (88 / 1.5 * scale)
-						&& mTouchY >= (291 / 1.5 * scale)
-						&& mTouchY <= (366 / 1.5 * scale)) {
-					background++;
+				if (mTouchX >= mPixels + (4 * xScale)
+						&& mTouchX <= mPixels + (98 * xScale)
+						&& mTouchY >= (328 * yScale)
+						&& mTouchY <= (408 * yScale)) {
 					hotSpot = null;
+					background++;
 					if (background >= ships.length) {
 						background = DEFAULT_BACKGROUND;
-						if (ship != null)
-							ship.recycle();
+						if (bitmapShip != null)
+							bitmapShip.recycle();
 					} else {
-						if (ship != null)
-							ship.recycle();
-
-						ship = BitmapFactory.decodeResource(res,
+						if (bitmapShip != null)
+							bitmapShip.recycle();
+						bitmapShip = BitmapFactory.decodeResource(res,
 								ships[background]);
+
 					}
 
 				}
 				// ship hotspot
-				if (shipFrame.contains(new Float(mTouchX).intValue(),
-						new Float(mTouchY).intValue())) {
-					shipFrameTouch();
+				if (background != DEFAULT_BACKGROUND) {
+					shipFrame.set((int) (SHIP_FRAME_LEFT * xScale) + mPixels,
+							(int) (SHIP_FRAME_TOP * yScale),
+							(int) ((SHIP_FRAME_LEFT + shipDrawWidth) * xScale)
+									+ mPixels,
+							(int) ((SHIP_FRAME_TOP + shipDrawHeight) * yScale));
+
+					screenShipSpots = getScreenShipSpots();
+					bitmapShipSpots = getBitmapShipSpots();
+					if (shipFrame.contains(new Float(mTouchX).intValue(),
+							new Float(mTouchY).intValue())) {
+						shipFrameTouch();
+					}
 				}
 				// Reschedule the next redraw
-				mHandler.removeCallbacks(mDrawCube);
+				mHandler.removeCallbacks(drawingThread);
 				if (mVisible) {
-					mHandler.post(mDrawCube);
+					mHandler.post(drawingThread);
 				}
 
 			} else {
@@ -386,43 +322,12 @@ public class LCARSWallpaper extends WallpaperService {
 		private void shipFrameTouch() {
 			hotSpot = null;
 			if (background > 0) {
-				String[] hotspots = res.getStringArray(ships_spots[background]);
-				for (int i = 0; i < hotspots.length; i++) {
-					String[] toks = hotspots[i].split(";");
-					Rect spot = new Rect();
-					String name = toks[0];
-					int x = Integer.parseInt(toks[1]);
-					int y = Integer.parseInt(toks[2]);
-					if (toks.length < 5) {
-						spot.set(
-								new Double(((x - 6) / 1.5) * scale + mPixels
-										+ (shipFrame.left - mPixels))
-										.intValue(),
-								new Double((y / 1.5) * scale - (6 * scale))
-										.intValue() + shipFrame.top,
-								new Double((x / 1.5) * scale + (6 * scale)
-										+ mPixels + (shipFrame.left - mPixels))
-										.intValue(), new Double((y / 1.5)
-										* scale + (6 * scale)).intValue()
-										+ shipFrame.top);
-					} else {
-						int x2 = Integer.parseInt(toks[3]);
-						int y2 = Integer.parseInt(toks[4]);
-						spot.set(new Double(((x) / 1.5) * scale + mPixels
-								+ (shipFrame.left - mPixels)).intValue(),
-								new Double((y / 1.5) * scale).intValue()
-										+ shipFrame.top, new Double((x2 / 1.5)
-										* scale + mPixels
-										+ (shipFrame.left - mPixels))
-										.intValue(), new Double((y2 / 1.5)
-										* scale).intValue()
-										+ shipFrame.top);
-
-					}
+				for (int i = 0; i < screenShipSpots.length; i++) {
+					Rect spot = screenShipSpots[i].rect;
 					if (spot.contains(new Float(mTouchX).intValue(), new Float(
 							mTouchY).intValue())) {
-						hotSpot = new ShipHotSpot(new Rect(spot.left, spot.top,
-								spot.right, spot.bottom), name);
+						hotSpot = new ShipHotSpot(bitmapShipSpots[i].rect,
+								bitmapShipSpots[i].name);
 					}
 				}
 			}
@@ -433,84 +338,104 @@ public class LCARSWallpaper extends WallpaperService {
 		 * by posting a delayed Runnable. You can do any drawing you want in
 		 * here.
 		 */
-		void drawFrame(boolean force) {
-			final SurfaceHolder holder = getSurfaceHolder();
+		void drawFrame() {
 
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-				if (c != null) {
-					// draw something
-					drawBitmap(c);
-					if (isPortrait) {
-						if (bCaution)
-							drawCaution(c);
-						if (background > DEFAULT_BACKGROUND)
-							drawShip(c);
-						drawText(c);
-						drawButtonText(c);
-						if (mode == 0) {
-							drawProcText(c);
-						} else if (mode == 1) {
-							drawAtom(c);
-							drawPowerStats(c);
-						}
-					}
+			setDimensions();
+			Canvas c;
+			// draw something
+			if (isPortrait) {
+
+				c = new Canvas(bitmapMutablePortrait);
+				c.drawBitmap(bitmapLcarsPortrait, 0, 0,
+						lcarsPaint.getBitmapPaint());
+				if (bCaution)
+					drawCaution(c);
+				if (background > DEFAULT_BACKGROUND) {
+					shipHeight = bitmapShip.getHeight();
+					shipWidth = bitmapShip.getWidth();
+					shipRatio = (float) shipWidth / (float) shipHeight;
+					shipDrawWidth = 600;
+					shipDrawHeight = shipDrawWidth / shipRatio;
+
+					drawShip(c);
 				}
-
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-
+				drawText(c);
+				drawButtonText(c);
+				if (systemPanelMode == PROCESSES_MODE) {
+					drawProcText(c);
+				} else if (systemPanelMode == ELECTRON_MODE) {
+					drawAtom(c);
+					drawPowerStats(c);
+				}
 			}
+			SurfaceHolder holder = getSurfaceHolder();
+			c = holder.lockCanvas();
+			if (c != null)
+				drawBitmap(c);
+			holder.unlockCanvasAndPost(c);
 
 			// Reschedule the next redraw
-			mHandler.removeCallbacks(mDrawCube);
+			mHandler.removeCallbacks(drawingThread);
 			if (mVisible) {
-				mHandler.postDelayed(mDrawCube, framerate);
+				if (batteryReceiver.isBatteryLow(20)){
+					framerate = CAUTION_FR;
+				} else if (systemPanelMode == ELECTRON_MODE){
+					framerate = ELECTRON_FR;
+				} else {
+					framerate = NORMAL_FR;
+				}
+				mHandler.postDelayed(drawingThread, framerate);
 			}
 		}
 
 		void drawBitmap(Canvas c) {
 			if (!isPortrait) {
-				c.drawBitmap(lcars_land, mPixels, 0, bitmapPaint);
+				c.drawBitmap(bitmapLcarsLandscape, mPixels, 0,
+						lcarsPaint.getBitmapPaint());
 			} else {
-				c.drawBitmap(lcars, mPixels, 0, bitmapPaint);
+				c.drawBitmap(bitmapMutablePortrait, lcarsRect, wallpaperRect,
+						lcarsPaint.getBitmapPaint());
+				lcarsPaint.getHotspotPaint().setStyle(Style.STROKE);
+				// c.drawRect(shipFrame, lcarsPaint.getHotspotPaint());
+				// if (screenShipSpots != null) {
+				// for (int i = 0; i < screenShipSpots.length; i++) {
+				// if (screenShipSpots[i] != null)
+				// c.drawRect(screenShipSpots[i].rect,
+				// lcarsPaint.getHotspotPaint());
+				// }
+				// }
 			}
 		}
 
 		void drawShip(Canvas c) {
-			int shipHeight = ship.getHeight();
-			int shipWidth = ship.getWidth();
-			float ratio = (float) shipWidth / (float) shipHeight;
-			float frameWidth = (540 / 1.5f) * scale;
-			float frameHeight = frameWidth / ratio;
+			shipDrawFrame.set(110, 300, 690, 860);
 			shipRect.right = shipRect.left + shipWidth;
 			shipRect.bottom = shipRect.top + shipHeight;
-			shipFrame.right = shipFrame.left + new Float(frameWidth).intValue();
-			shipFrame.bottom = shipFrame.top
-					+ new Float(frameHeight).intValue();
-			hotspotPaint.setColor(0xffFF9F00); // yellowish
-			hotspotPaint.setTextSize(scale * TEXT_MEDIUM);
-			c.drawText(res.getString(ships_names[background]), shipFrame.left,
-					shipFrame.top, hotspotPaint);
-			c.drawBitmap(ship, shipRect, shipFrame, bitmapPaint);
+			shipDrawFrame.right = shipDrawFrame.left
+					+ new Float(shipDrawWidth).intValue();
+			shipDrawFrame.bottom = shipDrawFrame.top
+					+ new Float(shipDrawHeight).intValue();
+			lcarsPaint.getHotspotPaint().setColor(0xffFF9F00); // yellowish
+			lcarsPaint.getHotspotPaint().setTextSize(LCARSPaint.TEXT_LARGE);
+			c.drawText(res.getString(ships_names[background]),
+					shipDrawFrame.left, shipDrawFrame.top,
+					lcarsPaint.getHotspotPaint());
+			c.drawBitmap(bitmapShip, shipRect, shipDrawFrame,
+					lcarsPaint.getBitmapPaint());
 			if (hotSpot != null) {
-				hotspotPaint.setColor(0xff9f9fff); // blueish
-				hotspotPaint.setTextSize(scale * TEXT_SMALL);
-				c.drawText(hotSpot.name, new Float(shipFrame.left
-						+ (12 * scale)).intValue(), shipFrame.top
-						+ (TEXT_MEDIUM * scale), hotspotPaint);
+				lcarsPaint.getHotspotPaint().setColor(0xff9f9fff); // blueish
+				lcarsPaint.getHotspotPaint().setTextSize(LCARSPaint.TEXT_MEDIUM);
+				c.drawText(hotSpot.name,
+						new Float(shipDrawFrame.left + 12).intValue(),
+						shipDrawFrame.top + LCARSPaint.TEXT_MEDIUM,
+						lcarsPaint.getHotspotPaint());
 				drawLabel(
-						new Point(
-								new Float(shipFrame.left + (3 * scale))
-										.intValue(),
-								new Float(shipFrame.top
-										+ ((TEXT_MEDIUM / 1.5) * scale))
-										.intValue()),
-						new Point(hotSpot.hotspot.centerX(), hotSpot.hotspot
+						new Point(new Float(shipDrawFrame.left + 3).intValue(),
+								new Float(shipDrawFrame.top
+										+ LCARSPaint.TEXT_MEDIUM).intValue()),
+						new Point(hotSpot.rect.centerX(), hotSpot.rect
 								.centerY()), c);
-				hotspotPaint.setColor(0xffcf6060); // reddish
+				lcarsPaint.getHotspotPaint().setColor(0xffcf6060); // reddish
 				// c.drawRect(hotSpot.hotspot.left, hotSpot.hotspot.top,
 				// hotSpot.hotspot.right, hotSpot.hotspot.bottom,
 				// hotspotPaint);
@@ -520,72 +445,75 @@ public class LCARSWallpaper extends WallpaperService {
 
 		void drawLabel(Point start, Point end, Canvas c) {
 			Path linePath = new Path();
-			Paint linePaint = new Paint(hotspotPaint);
+			Paint linePaint = new Paint(lcarsPaint.getHotspotPaint());
 			// background shadow
 			linePaint.setStyle(Paint.Style.STROKE);
 			linePath.moveTo(start.x, start.y);
-			linePath.lineTo(start.x, end.y - 2 * scale);
-			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale,
-					end.y, start.x + 2 * scale, end.y);
+			linePath.lineTo(start.x, end.y - 2);
+			linePath.cubicTo(start.x, end.y - 1, start.x + 1, end.y,
+					start.x + 2, end.y);
 			linePath.lineTo(end.x, end.y);
 			linePaint.setColor(0x4B000000); // fade
-			linePaint.setStrokeWidth(6 * scale);
+			linePaint.setStrokeWidth(6);
 			c.drawPath(linePath, linePaint);
 			linePaint.setStrokeWidth(0);
 			linePaint.setStyle(Paint.Style.FILL);
-			c.drawCircle(start.x, start.y, 6 * scale, linePaint);
-			c.drawCircle(end.x, end.y, 6 * scale, linePaint);
+			c.drawCircle(start.x, start.y, 6, linePaint);
+			c.drawCircle(end.x, end.y, 6, linePaint);
 
 			// foreground line
 			linePaint.setStyle(Paint.Style.STROKE);
 			linePath.moveTo(start.x, start.y);
-			linePath.lineTo(start.x, end.y - 2 * scale);
-			linePath.cubicTo(start.x, end.y - 1 * scale, start.x + 1 * scale,
-					end.y, start.x + 2 * scale, end.y);
+			linePath.lineTo(start.x, end.y - 2);
+			linePath.cubicTo(start.x, end.y - 1, start.x + 1, end.y,
+					start.x + 2, end.y);
 			linePath.lineTo(end.x, end.y);
 			linePaint.setColor(0xff9f9fff); // blueish
-			linePaint.setStrokeWidth(2 * scale);
+			linePaint.setStrokeWidth(2);
 			c.drawPath(linePath, linePaint);
 			linePaint.setStrokeWidth(0);
 			linePaint.setStyle(Paint.Style.FILL);
-			c.drawCircle(start.x, start.y, 2 * scale, linePaint);
-			c.drawCircle(end.x, end.y, 2 * scale, linePaint);
+			c.drawCircle(start.x, start.y, 2, linePaint);
+			c.drawCircle(end.x, end.y, 2, linePaint);
 		}
 
 		void drawPowerStats(Canvas c) {
-			int h = Math.round(scale * 320);
-			powerPaint.setTextSize(scale * TEXT_LARGE);
-			c.drawText("STATUS:", mPixels + (scale * 625), h, powerPaint);
-			h += (scale * 17);
-			powerPaint.setTextSize(scale * TEXT_MEDIUM);
-			c.drawText(status, mPixels + (scale * 625), h, powerPaint);
-			h += (scale * 36);
-			powerPaint.setTextSize(scale * TEXT_LARGE);
-			c.drawText("LEVEL:", mPixels + (scale * 625), h, powerPaint);
-			h += (scale * 17);
-			powerPaint.setTextSize(scale * TEXT_MEDIUM);
-			c.drawText(level, mPixels + (scale * 625), h, powerPaint);
-			h += (scale * 36);
-			powerPaint.setTextSize(scale * TEXT_LARGE);
-			c.drawText("ENERGY:", mPixels + (scale * 625), h, powerPaint);
-			// h += (scale * 17);
-			powerPaint.setTextSize(scale * TEXT_MEDIUM);
-			// c.drawText(dynCm + " dyn/cm", mPixels + (scale * 625), h,
-			// wPaint);
-			h += (scale * 17);
-			c.drawText(eV + " V", mPixels + (scale * 625), h, powerPaint);
+			int h = 600;
+			int x = 1040;
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_LARGE);
+			c.drawText("STATUS:", x, h, lcarsPaint.getPowerPaint());
+			h += 17;
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_MEDIUM);
+			c.drawText(batteryReceiver.getStatus(), x, h,
+					lcarsPaint.getPowerPaint());
+			h += 36;
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_LARGE);
+			c.drawText("LEVEL:", x, h, lcarsPaint.getPowerPaint());
+			h += 17;
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_MEDIUM);
+			c.drawText(batteryReceiver.getBatteryLevel() + "%", x, h,
+					lcarsPaint.getPowerPaint());
+			h += 36;
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_LARGE);
+			c.drawText("ENERGY:", x, h, lcarsPaint.getPowerPaint());
+			lcarsPaint.getPowerPaint().setTextSize(LCARSPaint.TEXT_MEDIUM);
+			h += 17;
+			c.drawText(batteryReceiver.geteV() + " V", x, h,
+					lcarsPaint.getPowerPaint());
 		}
 
 		void drawAtom(Canvas c) {
 			if (isPortrait) {
-				c.drawBitmap(deuterium, mPixels + (scale * 487), (scale * 173),
-						bitmapPaint);
-				electronPaint.setColor(0xffffffff);
+				c.drawBitmap(bitmapDeuterium,
+						940 - (bitmapDeuterium.getWidth() / 2),
+						439 - (bitmapDeuterium.getHeight() / 2),
+						lcarsPaint.getBitmapPaint());
+				lcarsPaint.getElectronPaint().setColor(0xffffffff);
 				c.drawCircle(electronThread.getX1(), electronThread.getY1(), 8,
-						electronPaint);
-				electronPaint.setColor(0xffff9f00);
+						lcarsPaint.getElectronPaint());
+				lcarsPaint.getElectronPaint().setColor(0xffff9f00);
 				c.drawCircle(electronThread.getX1(), electronThread.getY1(), 6,
-						electronPaint);
+						lcarsPaint.getElectronPaint());
 				// c.drawPath(LCARSPath.getTopRightCorner(0f, 0f, 50f,
 				// electronThread.getX1(), electronThread.getY1(), 100f),
 				// electronPaint);
@@ -594,96 +522,145 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		private int loop = 0;
-		private Bitmap ship;
+		private Bitmap bitmapShip;
 		private ShipHotSpot hotSpot;
+		private float shipDrawWidth;
+		private float shipDrawHeight;
+		private int shipHeight;
+		private int shipWidth;
+		private float shipRatio;
 
 		void drawCaution(Canvas c) {
 			if (isPortrait) {
 				loop++;
 				if (loop > 20)
 					loop = 0;
-				c.drawBitmap(caution, mPixels + (scale * (100 / 1.5f)),
-						(scale * (285 / 1.5f)), bitmapPaint);
+				c.drawBitmap(bitmapCaution, mPixels + (scale * (100 / 1.5f)),
+						(scale * (285 / 1.5f)), lcarsPaint.getBitmapPaint());
 				int factor = Math.abs(10 - loop);
 				factor = factor * 5;
 				factor = 50 + factor;
 				int hex = Integer.parseInt(Integer.toHexString(factor)
 						+ "000000", 16);
-				electronPaint.setColor(hex);
-				Align align = usagePaint.getTextAlign();
-				usagePaint.setTextAlign(Align.CENTER);
-				c.drawText("DEUTERIUM LEVELS AT " + level, mPixels + scale
-						* ((285 + 80) / 1.5f), (scale * ((285 + 305) / 1.5f)),
-						usagePaint);
-				usagePaint.setTextAlign(align);
+				lcarsPaint.getElectronPaint().setColor(hex);
+				Align align = lcarsPaint.getUsagePaint().getTextAlign();
+				lcarsPaint.getUsagePaint().setTextAlign(Align.CENTER);
+				c.drawText(
+						"DEUTERIUM LEVELS AT "
+								+ batteryReceiver.getBatteryLevel() + "%",
+						mPixels + scale * ((285 + 80) / 1.5f),
+						(scale * ((285 + 305) / 1.5f)),
+						lcarsPaint.getUsagePaint());
+				lcarsPaint.getUsagePaint().setTextAlign(align);
 
 				c.drawRect(mPixels + (scale * (100 / 1.5f)),
 						(scale * (285 / 1.5f)), mPixels
 								+ (scale * ((100 + 517) / 1.5f)),
-						(scale * ((285 + 458) / 1.5f)), electronPaint);
+						(scale * ((285 + 458) / 1.5f)),
+						lcarsPaint.getElectronPaint());
 			}
 		}
 
 		void drawButtonText(Canvas c) {
-			c.drawText(statsThread.getsSpeed(), mPixels + (scale * 625),
-					(scale * 161), buttonPaint);
+
+			c.drawText(statsThread.getsSpeed(), 1016, 274,
+					lcarsPaint.getButtonPaint());
 		}
 
 		void drawProcText(Canvas c) {
 
-			int h = Math.round(scale * 177);
+			int h = 300;
 			Process[] processes = memThread.getProcesses();
 			for (int i = 0; i < processes.length; i++) {
-				c.drawText(processes[i].getName(), mPixels + (scale * 548), h,
-						processPaint);
-				c.drawText(String.valueOf(processes[i].getPid()), mPixels
-						+ (scale * 575), h, processPaint);
-				c.drawText(String.valueOf(processes[i].getMemory()), mPixels
-						+ (scale * 625), h, processPaint);
+				c.drawText(processes[i].getName(), 930, h,
+						lcarsPaint.getProcessPaint());
+				c.drawText(String.valueOf(processes[i].getPid()), 975, h,
+						lcarsPaint.getProcessPaint());
+				c.drawText(String.valueOf(processes[i].getMemory()), 1050, h,
+						lcarsPaint.getProcessPaint());
 				h += (scale * 17);
 			}
 		}
 
 		void drawText(Canvas c) {
-
+			int[] columns = { 140, 170, 250 };
+			int[] rows = { 70, 100, 130, 160, 190, 220 };
 			try {
-				c.drawText(statsThread.getUsage() + "%", mPixels
-						+ (scale * 367), (scale * 200), usagePaint);
+				c.drawText(statsThread.getUsage() + "%", 520, 300,
+						lcarsPaint.getUsagePaint());
 				// c.drawText(dur + " " + sDays + " " + sHours + ":" + sMins +
 				// ":" +
 				// sSecs, mPixels + 222, 69, ulPaint);
-				c.drawText("DUR", mPixels + (scale * 87), (scale * 46),
-						uptimePaint);
-				c.drawText(statsThread.getUpDays(), mPixels + (scale * 107),
-						(scale * 46), uptimePaint);
+				c.drawText("DUR", columns[0], rows[0],
+						lcarsPaint.getUptimePaint());
+				c.drawText(statsThread.getUpDays(), columns[1], rows[0],
+						lcarsPaint.getUptimePaint());
 				c.drawText(
 						statsThread.getUpHours() + ":"
 								+ statsThread.getUpMins() + ":"
-								+ statsThread.getUpSecs(), mPixels
-								+ (scale * 160), (scale * 46), uptimePaint);
-				c.drawText("SD", mPixels + (scale * 87), (scale * 63),
-						uptimePaint);
-				c.drawText("--", mPixels + (scale * 107), (scale * 63),
-						uptimePaint);
-				c.drawText(String.valueOf(DateCalc.stardate()), mPixels
-						+ (scale * 160), (scale * 63), uptimePaint);
-				c.drawText("TER", mPixels + (scale * 87), (scale * 81),
-						uptimePaint);
-				c.drawText(statsThread.gettHours(), mPixels + (scale * 107),
-						(scale * 81), uptimePaint);
-				c.drawText(statsThread.gettDate(), mPixels + (scale * 160),
-						(scale * 81), uptimePaint);
-				c.drawText("TTC", mPixels + (scale * 87), (scale * 98),
-						uptimePaint);
-				c.drawText("--", mPixels + (scale * 107), (scale * 98),
-						uptimePaint);
-				c.drawText(statsThread.getsTTC(), mPixels + (scale * 160),
-						(scale * 98), uptimePaint);
+								+ statsThread.getUpSecs(), columns[2], rows[0],
+						lcarsPaint.getUptimePaint());
+				c.drawText("SD", columns[0], rows[1],
+						lcarsPaint.getUptimePaint());
+				c.drawText("--", columns[1], rows[1],
+						lcarsPaint.getUptimePaint());
+				c.drawText(String.valueOf(DateCalc.stardate()), columns[2],
+						rows[1], lcarsPaint.getUptimePaint());
+				c.drawText("TER", columns[0], rows[2],
+						lcarsPaint.getUptimePaint());
+				c.drawText(statsThread.gettHours(), columns[1], rows[2],
+						lcarsPaint.getUptimePaint());
+				c.drawText(statsThread.gettDate(), columns[2], rows[2],
+						lcarsPaint.getUptimePaint());
+				c.drawText("TTC", columns[0], rows[3],
+						lcarsPaint.getUptimePaint());
+				c.drawText("--", columns[1], rows[3],
+						lcarsPaint.getUptimePaint());
+				c.drawText(statsThread.getsTTC(), columns[2], rows[3],
+						lcarsPaint.getUptimePaint());
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 
+		}
+
+		private ShipHotSpot[] getScreenShipSpots() {
+			return getSpots(((shipDrawWidth / shipWidth) * xScale),
+					((shipDrawHeight / shipHeight) * yScale), shipFrame);
+		}
+
+		private ShipHotSpot[] getBitmapShipSpots() {
+			return getSpots((shipDrawWidth / shipWidth),
+					(shipDrawHeight / shipHeight), shipDrawFrame);
+		}
+
+		private ShipHotSpot[] getSpots(float widthScale, float heightScale,
+				Rect shipFrame) {
+			String[] hotspots = res.getStringArray(ships_spots[background]);
+			ShipHotSpot[] spots = new ShipHotSpot[hotspots.length];
+			for (int i = 0; i < hotspots.length; i++) {
+				String[] toks = hotspots[i].split(";");
+				Rect spot = new Rect();
+				String name = toks[0];
+				int x = (int) (Integer.parseInt(toks[1]) * widthScale);
+				int y = (int) (Integer.parseInt(toks[2]) * heightScale);
+				if (toks.length < 5) {
+					spot.set(new Double((x - 6) + (shipFrame.left)).intValue(),
+							new Double(y - (6)).intValue() + shipFrame.top,
+							new Double(x + (6) + (shipFrame.left)).intValue(),
+							new Double(y + 6).intValue() + shipFrame.top);
+				} else {
+					int x2 = (int) (Integer.parseInt(toks[3]) * widthScale);
+					int y2 = (int) (Integer.parseInt(toks[4]) * heightScale);
+					spot.set(new Double(x + (shipFrame.left)).intValue(),
+							new Double(y).intValue() + shipFrame.top,
+							new Double(x2 + (shipFrame.left)).intValue(),
+							new Double(y2).intValue() + shipFrame.top);
+
+				}
+				spots[i] = new ShipHotSpot(spot, name);
+			}
+			return spots;
 		}
 
 	}

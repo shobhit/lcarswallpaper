@@ -3,7 +3,7 @@ package com.example.android.maxpapers.lcars;
 import android.graphics.Rect;
 
 public class ShipHotSpot {
-	Rect hotspot = new Rect();
+	Rect rect = new Rect();
 	String name = "";
 	/**
 	 * @param hotspot
@@ -11,7 +11,7 @@ public class ShipHotSpot {
 	 */
 	public ShipHotSpot(Rect hotspot, String name) {
 		super();
-		this.hotspot = hotspot;
+		this.rect = hotspot;
 		this.name = name;
 	}
 	
