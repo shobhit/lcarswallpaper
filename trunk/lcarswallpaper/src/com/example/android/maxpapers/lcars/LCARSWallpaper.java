@@ -203,10 +203,12 @@ public class LCARSWallpaper extends WallpaperService {
 
 			} else {
 				isPortrait = true;
-				
+
 			}
-			displayWidth = holder.getSurfaceFrame().right - holder.getSurfaceFrame().left;
-			displayHeight = holder.getSurfaceFrame().bottom - holder.getSurfaceFrame().top;
+			displayWidth = holder.getSurfaceFrame().right
+					- holder.getSurfaceFrame().left;
+			displayHeight = holder.getSurfaceFrame().bottom
+					- holder.getSurfaceFrame().top;
 
 			setDimensions();
 			drawFrame();
@@ -245,7 +247,11 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
-			mPixels = xPixels;
+			//mPixels = xPixels;
+
+			//if ((xOffset != .5) && mPixels == 0) {
+				mPixels = (int) -((wallWidth/2) * xOffset);
+			//}
 			shipFrame.set((int) (SHIP_FRAME_LEFT * xScale) + xPixels,
 					(int) (SHIP_FRAME_TOP * yScale),
 					(int) ((SHIP_FRAME_LEFT + shipDrawWidth) * xScale)
@@ -395,13 +401,16 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		void drawBitmap(Canvas c) {
-			WallpaperManager wm = WallpaperManager.getInstance(getBaseContext());
+			WallpaperManager wm = WallpaperManager
+					.getInstance(getBaseContext());
 			if (!isPortrait) {
 				c.drawBitmap(bitmapLcarsLandscape,
 						new Rect(0, 0, bitmapLcarsLandscape.getWidth(),
 								bitmapLcarsLandscape.getHeight()), new Rect(
-								mPixels, 0, wm.getDesiredMinimumWidth() + mPixels,
-								getResources().getDisplayMetrics().heightPixels), lcarsPaint.getBitmapPaint());
+								mPixels, 0, wm.getDesiredMinimumWidth()
+										+ mPixels, getResources()
+										.getDisplayMetrics().heightPixels),
+						lcarsPaint.getBitmapPaint());
 			} else {
 				c.drawBitmap(bitmapMutablePortrait, lcarsRect, wallpaperRect,
 						lcarsPaint.getBitmapPaint());
