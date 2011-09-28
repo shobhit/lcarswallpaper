@@ -3,6 +3,10 @@
   * Expect display glitches
   * Stability tested on Moto Droid BIONIC
 
+== 1.1 ==
+  * Fixes issue with Samsung launcher on Galaxy S (2.2.1) not scrolling the LCARS wallpaper with the home screens (may also fix other phones with similar behavior)
+  * A lot of code re-factoring to warrant a new minor release number
+
 == 1.0.3 ==
   * Should work on different resolutions now
   * Deuterium electron animation thread now calculates next position only once per frame, gaining a few % of CPU when active
