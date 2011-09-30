@@ -143,7 +143,7 @@ public class LCARSWallpaper extends WallpaperService {
 					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
 					10000);
 			statsThread = new StatsThread(1000);
-			electronThread = new ElectronCalcThread(1, 1, 0);
+			electronThread = new ElectronCalcThread(0);
 
 		}
 
