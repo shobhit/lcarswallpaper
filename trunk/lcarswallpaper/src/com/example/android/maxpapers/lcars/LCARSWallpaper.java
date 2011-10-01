@@ -49,6 +49,7 @@ public class LCARSWallpaper extends WallpaperService {
 	private final int ELECTRON_FR = 10;
 	private final int CAUTION_FR = 100;
 	private final int NORMAL_FR = 1000;
+	private final int MEMORY_FR = 15000;
 	private final int DEFAULT_BACKGROUND = 0;
 
 	@Override
@@ -83,6 +84,7 @@ public class LCARSWallpaper extends WallpaperService {
 		private int displayWidth = getResources().getDisplayMetrics().widthPixels * 2;
 		private int displayHeight = getResources().getDisplayMetrics().heightPixels;
 		private int mPixels;
+		private float mOffset;
 		private float mTouchX;
 		private float mTouchY;
 		private Bitmap bitmapLcarsPortrait;
@@ -141,8 +143,8 @@ public class LCARSWallpaper extends WallpaperService {
 			systemPanelMode = PROCESSES_MODE;
 			memThread = new MemoryThread(
 					(ActivityManager) getSystemService(Context.ACTIVITY_SERVICE),
-					10000);
-			statsThread = new StatsThread(1000);
+					MEMORY_FR);
+			statsThread = new StatsThread(NORMAL_FR);
 			electronThread = new ElectronCalcThread(0);
 
 		}
@@ -248,7 +250,7 @@ public class LCARSWallpaper extends WallpaperService {
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
 			//mPixels = xPixels;
-
+			mOffset = xOffset;
 			//if ((xOffset != .5) && mPixels == 0) {
 				mPixels = (int) -((wallWidth/2) * xOffset);
 			//}
@@ -271,6 +273,9 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onTouchEvent(MotionEvent event) {
 			if (event.getAction() == MotionEvent.ACTION_DOWN) {
+				//pause some threads
+				memThread.pauseThread();
+				
 				mTouchX = event.getX();
 				mTouchY = event.getY();
 				// WARP EF button
@@ -325,6 +330,9 @@ public class LCARSWallpaper extends WallpaperService {
 				}
 
 			} else {
+				if (event.getAction() == MotionEvent.ACTION_UP){
+					memThread.resumeThread();
+				}
 				mTouchX = -1;
 				mTouchY = -1;
 			}
