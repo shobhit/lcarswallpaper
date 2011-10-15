@@ -12,7 +12,6 @@
 package com.example.android.maxpapers.lcars;
 
 import android.app.ActivityManager;
-import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -80,7 +79,6 @@ public class LCARSWallpaper extends WallpaperService {
 		private int wallWidth = 0;
 		private int wallHeight = 0;
 		private int mPixels;
-		private float mOffset;
 		private float mTouchX;
 		private float mTouchY;
 		private Bitmap bitmapLcarsPortrait;
@@ -240,11 +238,9 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
-			// mPixels = xPixels;
-			mOffset = xOffset;
-			// if ((xOffset != .5) && mPixels == 0) {
+			// Using xOffset because some launchers don't provide xPixels (looking at you Samsung)
 			mPixels = (int) -((wallWidth / 2) * xOffset);
-			// }
+			
 			shipFrame.set((int) (SHIP_FRAME_LEFT * xScale) + xPixels,
 					(int) (SHIP_FRAME_TOP * yScale),
 					(int) ((SHIP_FRAME_LEFT + shipDrawWidth) * xScale)
