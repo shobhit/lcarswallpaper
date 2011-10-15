@@ -77,12 +77,8 @@ public class LCARSWallpaper extends WallpaperService {
 		private LCARSPaint lcarsPaint;
 		float xScale;
 		float yScale;
-		private int wallWidth = WallpaperManager.getInstance(getBaseContext())
-				.getDesiredMinimumWidth();
-		private int wallHeight = WallpaperManager.getInstance(getBaseContext())
-				.getDesiredMinimumHeight();
-		private int displayWidth = getResources().getDisplayMetrics().widthPixels * 2;
-		private int displayHeight = getResources().getDisplayMetrics().heightPixels;
+		private int wallWidth = 0;
+		private int wallHeight = 0;
 		private int mPixels;
 		private float mOffset;
 		private float mTouchX;
@@ -103,7 +99,8 @@ public class LCARSWallpaper extends WallpaperService {
 		private Rect shipRect = new Rect();
 		private Rect shipFrame = new Rect();
 		private Rect shipDrawFrame = new Rect();
-		private Rect lcarsRect;
+		private Rect lcarsPortraitRect;
+		private Rect lcarsLandscapeRect;
 		private Rect wallpaperRect = new Rect();
 		private Resources res = getResources();
 		private ShipHotSpot[] screenShipSpots;
@@ -135,9 +132,10 @@ public class LCARSWallpaper extends WallpaperService {
 					com.example.android.maxpapers.R.drawable.caution);
 			bitmapLcarsLandscape = BitmapFactory.decodeResource(res,
 					com.example.android.maxpapers.R.drawable.lcars_land);
-			lcarsRect = new Rect(0, 0, bitmapLcarsPortrait.getWidth(),
+			lcarsLandscapeRect = new Rect(0, 0, bitmapLcarsLandscape.getWidth(),
+					bitmapLcarsLandscape.getHeight());
+			lcarsPortraitRect = new Rect(0, 0, bitmapLcarsPortrait.getWidth(),
 					bitmapLcarsPortrait.getHeight());
-			setDimensions();
 			lcarsPaint = new LCARSPaint(Typeface.createFromAsset(getAssets(),
 					"swiss_ec.ttf"), scale);
 			systemPanelMode = PROCESSES_MODE;
@@ -150,13 +148,10 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		private void setDimensions() {
-			if (wallWidth <= 0 || wallHeight <= 0) {
-				wallWidth = displayWidth;
-				wallHeight = displayHeight;
-			}
+			// android.os.Debug.waitForDebugger();
 			wallpaperRect.set(mPixels, 0, mPixels + wallWidth, wallHeight);
-			xScale = (float) wallWidth / bitmapLcarsPortrait.getWidth();
-			yScale = (float) wallHeight / bitmapLcarsPortrait.getHeight();
+			xScale = (float) wallWidth / (isPortrait?bitmapLcarsPortrait.getWidth():bitmapLcarsLandscape.getWidth());
+			yScale = (float) wallHeight / (isPortrait?bitmapLcarsPortrait.getHeight():bitmapLcarsLandscape.getHeight());
 		}
 
 		@Override
@@ -202,16 +197,11 @@ public class LCARSWallpaper extends WallpaperService {
 			super.onSurfaceChanged(holder, format, width, height);
 			if (width > height) {
 				isPortrait = false;
-
 			} else {
 				isPortrait = true;
-
 			}
-			displayWidth = holder.getSurfaceFrame().right
-					- holder.getSurfaceFrame().left;
-			displayHeight = holder.getSurfaceFrame().bottom
-					- holder.getSurfaceFrame().top;
-
+			wallWidth = width * 2;
+			wallHeight = height;
 			setDimensions();
 			drawFrame();
 		}
@@ -219,6 +209,7 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onSurfaceCreated(SurfaceHolder holder) {
 			super.onSurfaceCreated(holder);
+			setDimensions();
 			memThread.start();
 			statsThread.start();
 			electronThread.start();
@@ -249,11 +240,11 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onOffsetsChanged(float xOffset, float yOffset, float xStep,
 				float yStep, int xPixels, int yPixels) {
-			//mPixels = xPixels;
+			// mPixels = xPixels;
 			mOffset = xOffset;
-			//if ((xOffset != .5) && mPixels == 0) {
-				mPixels = (int) -((wallWidth/2) * xOffset);
-			//}
+			// if ((xOffset != .5) && mPixels == 0) {
+			mPixels = (int) -((wallWidth / 2) * xOffset);
+			// }
 			shipFrame.set((int) (SHIP_FRAME_LEFT * xScale) + xPixels,
 					(int) (SHIP_FRAME_TOP * yScale),
 					(int) ((SHIP_FRAME_LEFT + shipDrawWidth) * xScale)
@@ -263,6 +254,7 @@ public class LCARSWallpaper extends WallpaperService {
 				screenShipSpots = getScreenShipSpots();
 				bitmapShipSpots = getBitmapShipSpots();
 			}
+			setDimensions();
 			drawFrame();
 		}
 
@@ -273,9 +265,9 @@ public class LCARSWallpaper extends WallpaperService {
 		@Override
 		public void onTouchEvent(MotionEvent event) {
 			if (event.getAction() == MotionEvent.ACTION_DOWN) {
-				//pause some threads
+				// pause some threads
 				memThread.pauseThread();
-				
+
 				mTouchX = event.getX();
 				mTouchY = event.getY();
 				// WARP EF button
@@ -330,7 +322,7 @@ public class LCARSWallpaper extends WallpaperService {
 				}
 
 			} else {
-				if (event.getAction() == MotionEvent.ACTION_UP){
+				if (event.getAction() == MotionEvent.ACTION_UP) {
 					memThread.resumeThread();
 				}
 				mTouchX = -1;
@@ -360,7 +352,6 @@ public class LCARSWallpaper extends WallpaperService {
 		 */
 		void drawFrame() {
 
-			setDimensions();
 			Canvas c;
 			// draw something
 			if (isPortrait) {
@@ -409,19 +400,12 @@ public class LCARSWallpaper extends WallpaperService {
 		}
 
 		void drawBitmap(Canvas c) {
-			WallpaperManager wm = WallpaperManager
-					.getInstance(getBaseContext());
 			if (!isPortrait) {
-				c.drawBitmap(bitmapLcarsLandscape,
-						new Rect(0, 0, bitmapLcarsLandscape.getWidth(),
-								bitmapLcarsLandscape.getHeight()), new Rect(
-								mPixels, 0, wm.getDesiredMinimumWidth()
-										+ mPixels, getResources()
-										.getDisplayMetrics().heightPixels),
-						lcarsPaint.getBitmapPaint());
+				c.drawBitmap(bitmapLcarsLandscape, lcarsLandscapeRect,
+						wallpaperRect, lcarsPaint.getBitmapPaint());
 			} else {
-				c.drawBitmap(bitmapMutablePortrait, lcarsRect, wallpaperRect,
-						lcarsPaint.getBitmapPaint());
+				c.drawBitmap(bitmapMutablePortrait, lcarsPortraitRect,
+						wallpaperRect, lcarsPaint.getBitmapPaint());
 				lcarsPaint.getHotspotPaint().setStyle(Style.STROKE);
 				// c.drawRect(shipFrame, lcarsPaint.getHotspotPaint());
 				// if (screenShipSpots != null) {
