@@ -1,7 +1,11 @@
-== 1.0.x (trunk)==
+== 1.x (trunk)==
   * Still in development
   * Expect display glitches
   * Stability tested on Moto Droid BIONIC
+
+== 1.1.1 ==
+  * Landscape orientation should draw correctly (no flickering)
+  * NOTE: not designed for tablets.  Landscape mode is boring and portrait mode is optimized for 9:16 (16:9 portrait) aspect.
 
 == 1.1 ==
   * Fixes issue with Samsung launcher on Galaxy S (2.2.1) not scrolling the LCARS wallpaper with the home screens (may also fix other phones with similar behavior)
