@@ -19,7 +19,7 @@
 -->
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.android.maxpapers" android:installLocation="auto" android:versionName="1.1">
+    package="com.example.android.maxpapers" android:installLocation="auto" android:versionName="1.1.1">
 
     <uses-sdk android:minSdkVersion="7" />
     <uses-feature android:name="android.software.live_wallpaper" />
